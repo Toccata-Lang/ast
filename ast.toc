@@ -166,8 +166,8 @@
     (list "<LetAST " (str bindings) "\n" (str body) ">"))
 
   FileLineInfo
-  (file-name [_] (file-name bindings))
-  (line-number [_] (line-number bindings)))
+  (file-name [_] (file-name body))
+  (line-number [_] (line-number body)))
 
 (defn let-expr [bindings body]
   (let-ast bindings body))
@@ -213,8 +213,8 @@
           (list ">")))
 
   FileLineInfo
-  (file-name [_] (extract (map clause file-name)))
-  (line-number [_] (extract (map clause line-number))))
+  (file-name [_] (file-name clause))
+  (line-number [_] (line-number clause)))
 
 (defn either-expr [clause alt]
   (either-ast clause alt))
@@ -235,9 +235,9 @@
   (assert-ast assertion))
 
 
-(deftype returns-ast [sym assertion]
+(deftype result-ast [sym assertion]
   Stringable
-  (string-list [_] (list "<ReturnsAssertion " (str sym) " " (str assertion) ">"))
+  (string-list [_] (list "<ResultAssertion " (str sym) " " (str assertion) ">"))
   
   AssertionTest
   (not-assertion? [_] nothing)
@@ -246,8 +246,8 @@
   (file-name [_] (file-name sym))
   (line-number [_] (line-number sym)))
 
-(defn returns-expr [sym assertion]
-  (returns-ast sym assertion))
+(defn result-expr [sym assertion]
+  (result-ast sym assertion))
 
 
 (deftype prototype-ast [fn-name params doc default-body]
