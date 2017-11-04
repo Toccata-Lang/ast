@@ -220,6 +220,17 @@
   (either-ast clause alt))
 
 
+(deftype type-assertion [type-sym sym]
+  Stringable
+  (string-list [_] (list "<AssertType " (str type-sym) " " (str sym) ">"))
+
+  FileLineInfo
+  (file-name [_] (file-name type-sym))
+  (line-number [_] (line-number type-sym)))
+
+(defn assert-type [type-sym sym]
+  (type-assertion type-sym sym))
+
 (deftype assert-ast [assertion]
   Stringable
   (string-list [_] (list "<Assert " (str assertion) ">"))
