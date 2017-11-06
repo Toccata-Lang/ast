@@ -220,7 +220,7 @@
   (either-ast clause alt))
 
 
-(deftype type-assertion [type-sym sym]
+(deftype type-assertion [type-sym sym path]
   Stringable
   (string-list [_] (list "<AssertType " (str type-sym) " " (str sym) ">"))
 
@@ -229,7 +229,7 @@
   (line-number [_] (line-number type-sym)))
 
 (defn assert-type [type-sym sym]
-  (type-assertion type-sym sym))
+  (type-assertion type-sym sym empty-list))
 
 (deftype assert-ast [assertion]
   Stringable
