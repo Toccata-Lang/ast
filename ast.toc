@@ -15,7 +15,17 @@
     (either (map (first l) line-number)
             0)))
 
+(extend-type HashMap
+  FileLineInfo
+  (file-name [m]
+    (file-name (seq m)))
+  (line-number [m]
+    (line-number (seq m))))
+
 (deftype block-comment-ast [lines path-to-file line-num]
+  (assert (instance? Vector lines))
+  (assert (instance? Integer line-num))
+
   AssertionTest
   (not-assertion? [_] nothing)
 
@@ -33,6 +43,8 @@
 
 
 (deftype inline-ast [lang result-type txt path-to-file line-num]
+  (assert (instance? Integer line-num))
+
   Stringable
   (string-list [_] (list "<InlineAST>"))
 
@@ -45,6 +57,9 @@
 
 
 (deftype params-ast [fixed variadic]
+  (assert (instance? Vector fixed))
+  (assert (instance? Maybe variadic))
+
   Stringable
   (string-list [_] (comp (list "<Params ")
                          (flat-map (interpose fixed " ") string-list)
@@ -64,6 +79,9 @@
 
 
 (deftype main-ast [params body]
+  (assert (instance? params-ast params))
+  (assert (instance? Vector body))
+
   Stringable
   (string-list [_] (comp (list "<MainAST ")
                          (string-list params)
@@ -104,6 +122,11 @@
 
 
 (deftype fn-arity-ast [fn-sym fn-var params doc param-types body]
+  ;; (assert (instance? String fn-var))
+  (assert (instance? params-ast params))
+  (assert (instance? Vector param-types))
+  (assert (instance? Vector body))
+
   Stringable
   (string-list [_] (comp (list "<FnArityAst ")
                          (string-list params)
@@ -120,6 +143,9 @@
 
 
 (deftype fn-ast [fn-sym arities]
+  ;; TODO: changes required for this cause seg-fault
+  ;; (assert (instance? Vector arities))
+
   Stringable
   (string-list [_]
     (comp (list "<FunctionAST " (str fn-sym) " ")
@@ -135,6 +161,8 @@
 
 
 (deftype call-ast [call-target args]
+  (assert (instance? Vector args))
+
   Stringable
   (string-list [_]
     (list "<CallAST " (str call-target) " " (str args) ">"))
@@ -144,7 +172,7 @@
   (line-number [_] (line-number call-target)))
 
 (defn call-expr [[target & args]]
-  (call-ast target args))
+  (call-ast target (vec args)))
 
 
 (deftype binding-ast [binding val]
@@ -161,6 +189,9 @@
 
 
 (deftype let-ast [bindings body]
+  (assert (instance? Vector bindings))
+  (assert (instance? Vector body))
+
   Stringable
   (string-list [_]
     (list "<LetAST " (str bindings) "\n" (str body) ">"))
@@ -174,6 +205,9 @@
 
 
 (deftype and-ast [clauses]
+  ;; TODO: this causes a problem
+  ;; (assert (instance? Vector clauses))
+
   Stringable
   (string-list [_]
     (comp (list "<AndAST ")
@@ -189,6 +223,8 @@
 
 
 (deftype or-ast [clauses]
+  (assert (instance? Vector clauses))
+
   Stringable
   (string-list [_]
     (comp (list "<OrAST ")
@@ -221,6 +257,8 @@
 
 
 (deftype type-assertion [type-sym sym path]
+  (assert (instance? List path))
+
   Stringable
   (string-list [_] (list "<AssertType " (str type-sym) " " (str sym) ">"))
 
@@ -262,6 +300,10 @@
 
 
 (deftype prototype-ast [fn-name params doc default-body]
+  (assert (instance? params-ast params))
+  (assert (instance? block-comment-ast doc))
+  (assert (instance? Vector default-body))
+
   Stringable
   (string-list [_] (list "<PrototypeFnAST " (str fn-name) ">"))
 
@@ -274,6 +316,8 @@
 
 
 (deftype protocol-ast [protocol-sym prototypes]
+  (assert (instance? Vector prototypes))
+
   Stringable
   (string-list [_] (list "<ProtocolAST " (str protocol-sym) ">"))
 
@@ -286,6 +330,8 @@
 
 
 (deftype extend-ast [type impls]
+  (assert (instance? HashMap impls))
+
   Stringable
   (string-list [_] (list "<ExtendAST " (str type) ">"))
 
@@ -294,7 +340,8 @@
   (line-number [_] (line-number type)))
 
 (defn type-extension [type impls]
- (extend-ast type impls))
+ (extend-ast type (either (map (empty? impls) (fn [_] {}))
+                          (apply comp (filter impls (partial instance? HashMap))))))
 
 
 (deftype quoted-ast [q-val]
@@ -311,6 +358,8 @@
 
 
 (deftype reify-ast [type-num impls]
+  (assert (instance? HashMap impls))
+
   Stringable
   (string-list [_] (list "<Reify>"))
 
@@ -323,6 +372,9 @@
 
 
 (deftype type-ast [sym fields impls]
+  (assert (instance? params-ast fields))
+  (assert (instance? Vector impls))
+
   Stringable
   (string-list [_] (list "<TypeAST " (str sym) ">"))
 
@@ -334,13 +386,21 @@
   (type-ast sym fields impls))
 
 
-(deftype module-ast [file-path])
+(deftype module-ast [file-path]
+  (assert (instance? String file-path)))
 
 (defn module [file-path]
   (module-ast file-path))
 
 
-(deftype git-dep-ast [repo file args])
+(deftype git-dep-ast [repo file args]
+  (assert (instance? String repo))
+  (assert (instance? String file))
+  (assert (instance? HashMap args))
+
+  FileLineInfo
+  (file-name [_] (file-name repo))
+  (line-number [_] (line-number repo)))
 
 (defn git-dep [repo file args]
   (git-dep-ast repo file args))
