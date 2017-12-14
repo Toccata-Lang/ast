@@ -1,4 +1,7 @@
 
+(def SymbolOrString (comp Symbol
+                          String))
+
 (defprotocol FileLineInfo
   (file-name [ast] "")
   (line-number [ast] 0))
@@ -24,6 +27,7 @@
 
 (deftype block-comment-ast [lines path-to-file line-num]
   (assert (instance? Vector lines))
+  (assert (instance? SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
 
   AssertionTest
@@ -43,6 +47,11 @@
 
 
 (deftype inline-ast [lang result-type txt path-to-file line-num]
+  ;; TODO
+  ;; (assert (instance? Symbol lang))
+  (assert (instance? Maybe result-type))
+  (assert (instance? String txt))
+  (assert (instance? SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
 
   Stringable
@@ -97,19 +106,10 @@
   (main-ast params body))
 
 
-(deftype definition-ast [sym value]
-  Stringable
-  (string-list [_] (list "<DefAST " (str sym) ">"))
-
-  FileLineInfo
-  (file-name [_] (file-name sym))
-  (line-number [_] (line-number sym)))
-
-(defn definition [sym value]
-  (definition-ast sym value))
-
-
 (deftype declaration-ast [sym]
+  ;; TODO
+  ;; (assert (instance? Symbol sym))
+
   Stringable
   (string-list [_] (list "<DeclareAST " (str sym) ">"))
 
@@ -122,7 +122,7 @@
 
 
 (deftype fn-arity-ast [fn-sym fn-var params doc param-types body]
-  ;; (assert (instance? String fn-var))
+  (assert (instance? SymbolOrString fn-var))
   (assert (instance? params-ast params))
   (assert (instance? Vector param-types))
   (assert (instance? Vector body))
@@ -143,8 +143,8 @@
 
 
 (deftype fn-ast [fn-sym arities]
-  ;; TODO: changes required for this cause seg-fault
-  ;; (assert (instance? Vector arities))
+  (assert (instance? Maybe fn-sym))
+  (assert (instance? Vector arities))
 
   Stringable
   (string-list [_]
@@ -174,8 +174,13 @@
 (defn call-expr [[target & args]]
   (call-ast target (vec args)))
 
+(def BindingTarget (comp Symbol
+                         params-ast))
 
 (deftype binding-ast [binding val]
+  ;; TODO
+  ;; (assert (instance? BindingTarget binding))
+
   Stringable
   (string-list [_]
     (list "<BindingAST " (str binding) " " (str val) ">"))
@@ -205,8 +210,7 @@
 
 
 (deftype and-ast [clauses]
-  ;; TODO: this causes a problem
-  ;; (assert (instance? Vector clauses))
+  (assert (instance? Vector clauses))
 
   Stringable
   (string-list [_]
@@ -257,6 +261,9 @@
 
 
 (deftype type-assertion [type-sym sym path]
+  ;; TODO
+  ;; (assert (instance? Symbol type-sym))
+  ;; (assert (instance? Symbol sym))
   (assert (instance? List path))
 
   Stringable
@@ -269,7 +276,11 @@
 (defn assert-type [type-sym sym]
   (type-assertion type-sym sym empty-list))
 
+(def Assertion (comp type-assertion))
+
 (deftype assert-ast [assertion]
+  (assert (instance? Assertion assertion))
+
   Stringable
   (string-list [_] (list "<Assert " (str assertion) ">"))
 
@@ -285,6 +296,10 @@
 
 
 (deftype result-ast [sym assertion]
+  ;; TODO
+  ;; (assert (instance? Symbol sym))
+  (assert (instance? Assertion assertion))
+
   Stringable
   (string-list [_] (list "<ResultAssertion " (str sym) " " (str assertion) ">"))
   
@@ -316,6 +331,8 @@
 
 
 (deftype protocol-ast [protocol-sym prototypes]
+  ;; TODO
+  ;; (assert (instance? Symbol protocol-sym))
   (assert (instance? Vector prototypes))
 
   Stringable
@@ -330,6 +347,8 @@
 
 
 (deftype extend-ast [type impls]
+  ;; TODO
+  ;; (assert (instance? Symbol type))
   (assert (instance? HashMap impls))
 
   Stringable
@@ -341,7 +360,7 @@
 
 (defn type-extension [type impls]
  (extend-ast type (either (map (empty? impls) (fn [_] {}))
-                          (apply comp (filter impls (partial instance? HashMap))))))
+                          (apply comp (seq (filter impls (partial instance? HashMap)))))))
 
 
 (deftype quoted-ast [q-val]
@@ -358,6 +377,7 @@
 
 
 (deftype reify-ast [type-num impls]
+  (assert (instance? Integer type-num))
   (assert (instance? HashMap impls))
 
   Stringable
@@ -372,6 +392,8 @@
 
 
 (deftype type-ast [sym fields impls]
+  ;; TODO
+  ;; (assert (instance? Symbol sym))
   (assert (instance? params-ast fields))
   (assert (instance? Vector impls))
 
@@ -407,6 +429,9 @@
 
 
 (deftype add-ns-ast [ns-sym mod]
+  ;; TODO
+  ;; (assert (instance? Symbol ns-sym))
+
   Stringable
   (string-list [_] (list "<AddNS " (str ns-sym) ">"))
 
@@ -416,3 +441,18 @@
 
 (defn ns-add [ns mod]
   (add-ns-ast ns mod))
+
+(deftype definition-ast [sym value-exprs]
+  ;; TODO
+  ;; (assert (instance? Symbol sym))
+
+  Stringable
+  (string-list [_] (list "<DefAST " (str sym) ">"))
+
+  FileLineInfo
+  (file-name [_] (file-name sym))
+  (line-number [_] (line-number sym)))
+
+(defn definition [sym value]
+  (definition-ast sym value))
+
