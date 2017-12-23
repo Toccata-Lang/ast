@@ -18,6 +18,15 @@
     (either (map (first l) line-number)
             0)))
 
+(extend-type Vector
+  FileLineInfo
+  (file-name [v]
+    (either (map (first v) file-name)
+            ""))
+  (line-number [v]
+    (either (map (first v) line-number)
+            0)))
+
 (extend-type HashMap
   FileLineInfo
   (file-name [m]
@@ -260,6 +269,23 @@
   (either-ast clause alt))
 
 
+(deftype min-count-assertion [sym len path]
+  ;; TODO
+  ;; (assert (instance? Symbol sym))
+  (assert (instance? Integer len))
+  (assert (instance? List path))
+
+  Stringable
+  (string-list [_] (list "<AssertMinCount " (str sym) " " (str len) ">"))
+
+  FileLineInfo
+  (file-name [_] (file-name sym))
+  (line-number [_] (line-number sym)))
+
+(defn assert-min-count [sym len]
+  (min-count-assertion sym len empty-list))
+
+
 (deftype type-assertion [type-sym sym path]
   ;; TODO
   ;; (assert (instance? Symbol type-sym))
@@ -276,7 +302,8 @@
 (defn assert-type [type-sym sym]
   (type-assertion type-sym sym empty-list))
 
-(def Assertion (comp type-assertion))
+(def Assertion (comp type-assertion
+                     min-count-assertion))
 
 (deftype assert-ast [assertion]
   (assert (instance? Assertion assertion))
