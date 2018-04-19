@@ -130,10 +130,9 @@
   (declaration-ast sym))
 
 
-(deftype fn-arity-ast [fn-sym fn-var params doc param-types body]
+(deftype fn-arity-ast [fn-sym fn-var params doc body]
   (assert (instance? SymbolOrString fn-var))
   (assert (instance? params-ast params))
-  (assert (instance? Vector param-types))
   (assert (instance? Vector body))
 
   Stringable
@@ -148,7 +147,7 @@
   (line-number [_] (line-number body)))
 
 (defn fn-arity [params doc body]
-  (fn-arity-ast "" "" params doc [] body))
+  (fn-arity-ast "" "" params doc body))
 
 
 (deftype fn-ast [fn-sym arities]
