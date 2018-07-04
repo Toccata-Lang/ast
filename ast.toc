@@ -217,9 +217,9 @@
   (let-ast bindings body))
 
 
-;; TODO: indicate that 'clauses' must not be empty
 (deftype and-ast [clauses]
   (assert (instance? Vector clauses))
+  (assert (min-count clauses 1))
 
   Stringable
   (string-list [_]
@@ -269,19 +269,6 @@
   (either-ast clause alt))
 
 
-(deftype length-assertion [sym len path]
-  ;; TODO
-  ;; (assert (instance? Symbol sym))
-  (assert (instance? Integer len))
-  (assert (instance? List path))
-
-  Stringable
-  (string-list [_] (list "<AssertLength " (str sym) " " (str len) ">"))
-
-  FileLineInfo
-  (file-name [_] (file-name sym))
-  (line-number [_] (line-number sym)))
-
 (deftype min-count-assertion [sym len path]
   ;; TODO
   ;; (assert (instance? Symbol sym))
@@ -316,7 +303,6 @@
   (type-assertion type-sym sym empty-list))
 
 (def Assertion (comp type-assertion
-                     length-assertion
                      min-count-assertion))
 
 (deftype assert-ast [assertion]
