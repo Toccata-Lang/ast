@@ -487,3 +487,14 @@
 (defn definition [sym value]
   (definition-ast sym value))
 
+(def CodeAST (comp inline-ast
+                   let-ast
+                   and-ast
+                   or-ast
+                   either-ast
+                   quoted-ast
+                   reify-ast
+                   call-ast
+                   Symbol
+                   String
+                   Integer))
