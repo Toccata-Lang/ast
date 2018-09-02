@@ -79,10 +79,13 @@
   (assert (instance? Maybe variadic))
 
   Stringable
-  (string-list [_] (comp (list "<Params ")
-                         (flat-map (interpose fixed " ") string-list)
-                         (cons " " (string-list variadic))
-                         (list ">")))
+  (string-list [_]
+    (comp (list "[")
+          (flat-map (interpose fixed " ") string-list)
+          (either (map variadic (fn [variadic]
+                                  (cons " & " (string-list variadic))))
+                  empty-list)
+          (list "]")))
 
   Collection
   (count [_] (count fixed))
@@ -131,16 +134,15 @@
 
 
 (deftype fn-arity-ast [fn-sym fn-var params doc body]
-  (assert (instance? SymbolOrString fn-var))
   (assert (instance? params-ast params))
   (assert (instance? Vector body))
 
   Stringable
-  (string-list [_] (comp (list "<FnArityAst ")
+  (string-list [_] (comp (list "(")
                          (string-list params)
                          (list "\n")
-                         (string-list body)
-                         (list ">")))
+                         (flat-map (interpose body "\n") string-list)
+                         (list ")")))
 
   FileLineInfo
   (file-name [_] (file-name body))
@@ -156,9 +158,9 @@
 
   Stringable
   (string-list [_]
-    (comp (list "<FunctionAST " (str fn-sym) " ")
-          (string-list arities)
-          (list  ">")))
+    (comp (list "(fn " (str (either fn-sym "")) " ")
+          (flat-map arities string-list)
+          (list  ")")))
 
   FileLineInfo
   (file-name [_] (file-name arities))
@@ -173,7 +175,9 @@
 
   Stringable
   (string-list [_]
-    (list "<CallAST " (str call-target) " " (str args) ">"))
+    (comp (list "(" (str call-target) " ")
+          (flat-map (interpose (seq args) " ") string-list)
+          (list ")")))
 
   FileLineInfo
   (file-name [_] (file-name call-target))
@@ -223,9 +227,9 @@
 
   Stringable
   (string-list [_]
-    (comp (list "<AndAST ")
-          (flat-map clauses string-list)
-          (list ">")))
+    (comp (list "(and ")
+          (flat-map (interpose clauses "\n") string-list)
+          (list ")")))
 
   FileLineInfo
   (file-name [_] (extract (map (first clauses) file-name)))
@@ -255,11 +259,11 @@
 (deftype either-ast [clause alt]
   Stringable
   (string-list [_]
-    (comp (list "<EitherAST ")
+    (comp (list "(either ")
           (string-list clause)
-          (list ",")
+          (list "\n")
           (string-list alt)
-          (list ">")))
+          (list ")")))
 
   FileLineInfo
   (file-name [_] (file-name clause))
@@ -393,7 +397,7 @@
 (deftype quoted-ast [q-val]
   Stringable
   (string-list [_]
-    (list "<Quoted " (str q-val) ">"))
+    (list "'" (str q-val)))
 
   FileLineInfo
   (file-name [_] (file-name q-val))
