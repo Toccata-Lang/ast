@@ -391,7 +391,7 @@
 
 (defn type-extension [type impls]
  (extend-ast type (either (map (empty? impls) (fn [_] {}))
-                          (apply comp (seq (filter impls (partial instance? HashMap)))))))
+                          (apply* comp (seq (filter impls (partial instance? HashMap)))))))
 
 
 (deftype quoted-ast [q-val]
