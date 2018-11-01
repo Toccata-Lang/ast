@@ -1,13 +1,14 @@
 
+(add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
+                          "constraints.toc"
+                          :sha "b7c2946"))
+
 (def SymbolOrString (comp Symbol
                           String))
 
 (defprotocol FileLineInfo
   (file-name [ast] "")
   (line-number [ast] 0))
-
-(defprotocol AssertionTest
-  (not-assertion? [ast] (maybe ast)))
 
 (extend-type List
   FileLineInfo
@@ -38,9 +39,6 @@
   (assert (instance? Vector lines))
   (assert (instance? SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
-
-  AssertionTest
-  (not-assertion? [_] nothing)
 
   Stringable
   (string-list [_] (comp (list "<BlockCommentAST")
@@ -199,7 +197,7 @@
 
   Stringable
   (string-list [_]
-    (list "<BindingAST " (str binding) " " (str val) ">"))
+    (list (str binding) " " (str val) "\n"))
 
   FileLineInfo
   (file-name [_] (file-name binding))
@@ -208,14 +206,13 @@
 (defn binding [binding val]
   (binding-ast binding val))
 
-
 (deftype let-ast [bindings body]
   (assert (instance? Vector bindings))
   (assert (instance? Vector body))
 
   Stringable
   (string-list [_]
-    (list "<LetAST " (str bindings) "\n" (str body) ">"))
+    (list "(let " (str bindings) "\n" (apply str (interpose body "\n")) ")"))
 
   FileLineInfo
   (file-name [_] (file-name body))
@@ -276,77 +273,78 @@
 (defn either-expr [clause alt]
   (either-ast clause alt))
 
-
-(deftype min-count-assertion [sym len path]
-  ;; TODO
-  ;; (assert (instance? Symbol sym))
-  (assert (instance? Integer len))
-  (assert (instance? List path))
-
-  Stringable
-  (string-list [_] (list "<AssertMinCount " (str sym) " " (str len) ">"))
-
+(extend-type c/TypeConstraint
   FileLineInfo
-  (file-name [_] (file-name sym))
-  (line-number [_] (line-number sym)))
+  (file-name [c] (file-name (.type-sym c)))
+  (line-number [c] (line-number (.type-sym c))))
 
 (defn assert-min-count [sym len]
-  (min-count-assertion sym len empty-list))
+  (let [fn (file-name sym)]
+    ;; TODO: what was I thinking doing it this way. (Actually, I know.)
+    (c/ItemsConstraint (repeat len c/top-type)
+                       (list [(either (and (= fn 'core)
+                                           (maybe "$TOCCATA_DIR/core.toc"))
+                                      fn)
+                              (line-number sym)])
+                       (maybe sym)
+                       "")))
 
+(defn assert-vector-of [type-sym sym]
+  ;; TODO: type-sym actually needs to be type-expr
+  (let [fn (file-name type-sym)
+        path (list [(either (and (= fn 'core)
+                                   (maybe "$TOCCATA_DIR/core.toc"))
+                              fn)
+                      (line-number type-sym)])]
+    (c/intersect (c/TypeConstraint {} path 'Vector (maybe sym) "")
+                 (c/InnerConstraint (c/TypeConstraint {} path type-sym nothing "")
+                                    path (maybe sym) ""))))
 
-(deftype type-assertion [type-sym sym path]
-  ;; TODO
-  ;; (assert (instance? Symbol type-sym))
-  ;; (assert (instance? Symbol sym))
-  (assert (instance? List path))
+(defn assert-list-of [type-sym sym]
+  ;; TODO: this is wrong, 'sym' should not be in here
+  ;; TODO: type-sym actually needs to be type-expr
+  (let [fn (file-name type-sym)
+        path (list [(either (and (= fn 'core)
+                                   (maybe "$TOCCATA_DIR/core.toc"))
+                              fn)
+                      (line-number type-sym)])]
+    (c/intersect (c/TypeConstraint {} path 'List (maybe sym) "")
+                 (c/InnerConstraint (c/TypeConstraint {} path type-sym nothing "")
+                                    path (maybe sym) ""))))
 
-  Stringable
-  (string-list [_] (list "<AssertType " (str type-sym) " " (str sym) ">"))
+(def BitmapIndexedType (inline C Integer "(Value *)&(Integer){IntegerType, -1, BitmapIndexedType};"))
+(def ArrayNodeType (inline C Integer "(Value *)&(Integer){IntegerType, -1, ArrayNodeType};"))
+(def HashCollisionNodeType (inline C Integer "(Value *)&(Integer){IntegerType, -1, HashCollisionNodeType};"))
 
-  FileLineInfo
-  (file-name [_] (file-name type-sym))
-  (line-number [_] (line-number type-sym)))
+(defn assert-map-of [key-type val-type]
+  ;; TODO: key-type and val-type actually need to be type-expr
+  (c/intersect (c/TypeConstraint {BitmapIndexedType #{}
+                                  ArrayNodeType #{}
+                                  HashCollisionNodeType #{}}
+                                 empty-list 'HashMap nothing "")
+               (c/InnerConstraint (c/TypeConstraint {} empty-list val-type nothing "")
+                                  empty-list nothing "")))
 
 (defn assert-type [type-sym sym]
-  (type-assertion type-sym sym empty-list))
+  (let [fn (file-name type-sym)]
+    (c/TypeConstraint {} (list [(either (and (= fn 'core)
+                                             (maybe "$TOCCATA_DIR/core.toc"))
+                                        fn)
+                                (line-number type-sym)])
+                      type-sym (maybe sym) "")))
 
-(def Assertion (comp type-assertion
-                     min-count-assertion))
+(defn assert-max-value [max sym]
+  (let [fn (file-name sym)]
+    (c/MaxValue max (list [(either (and (= fn 'core)
+                                        (maybe "$TOCCATA_DIR/core.toc"))
+                                   fn)
+                           (line-number sym)])
+                (maybe sym) "")))
 
-(deftype assert-ast [assertion]
-  (assert (instance? Assertion assertion))
-
-  Stringable
-  (string-list [_] (list "<Assert " (str assertion) ">"))
-
-  AssertionTest
-  (not-assertion? [_] nothing)
-
-  FileLineInfo
-  (file-name [_] (file-name assertion))
-  (line-number [_] (line-number assertion)))
-
-(defn assert-expr [assertion]
-  (assert-ast assertion))
-
-
-(deftype result-ast [sym assertion]
-  ;; TODO
-  ;; (assert (instance? Symbol sym))
-  (assert (instance? Assertion assertion))
-
-  Stringable
-  (string-list [_] (list "<ResultAssertion " (str sym) " " (str assertion) ">"))
-  
-  AssertionTest
-  (not-assertion? [_] nothing)
-
-  FileLineInfo
-  (file-name [_] (file-name sym))
-  (line-number [_] (line-number sym)))
 
 (defn result-expr [sym assertion]
-  (result-ast sym assertion))
+  ;; TODO: no longer need 'sym'
+  (c/ResultConstraint assertion))
 
 
 (deftype prototype-ast [fn-name params doc default-body]
@@ -499,6 +497,12 @@
                    quoted-ast
                    reify-ast
                    call-ast
+                   fn-ast
                    Symbol
                    String
                    Integer))
+
+;; TODO: if I put ast/block-comment in, the result is unacceptable
+(def NoCode (comp c/ResultConstraint
+                  ast/block-comment-ast
+                  c/SymbolConstraints))
