@@ -53,6 +53,32 @@
   (block-comment-ast lines path-to-file line-num))
 
 
+(deftype integer-ast [int path-to-file line-num]
+  (assert (instance? Integer int))
+  (assert (instance? SymbolOrString path-to-file))
+  (assert (instance? Integer line-num))
+
+  Stringable
+  (string-list [_] (list (str int)))
+
+  FileLineInfo
+  (file-name [_] path-to-file)
+  (line-number [_] line-num))
+
+
+(deftype string-ast [string path-to-file line-num]
+  (assert (instance? String string))
+  (assert (instance? SymbolOrString path-to-file))
+  (assert (instance? Integer line-num))
+
+  Stringable
+  (string-list [_] (list "\"" string "\""))
+
+  FileLineInfo
+  (file-name [_] path-to-file)
+  (line-number [_] line-num))
+
+
 (deftype inline-ast [lang result-type txt path-to-file line-num]
   ;; TODO
   ;; (assert (instance? Symbol lang))
@@ -502,7 +528,6 @@
                    String
                    Integer))
 
-;; TODO: if I put ast/block-comment in, the result is unacceptable
 (def NoCode (comp c/ResultConstraint
                   ast/block-comment-ast
                   c/SymbolConstraints))
