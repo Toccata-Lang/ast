@@ -1,13 +1,15 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b7c2946"))
+                          :sha "6d8065c"))
 
 (def SymbolOrString (comp Symbol
                           String))
 
 (defprotocol FileLineInfo
-  (file-name [ast] "")
+  (file-name [ast]
+    (assert-result x (instance? SymbolOrString x))
+    "")
   (line-number [ast] 0))
 
 (extend-type List
@@ -271,9 +273,9 @@
 
   Stringable
   (string-list [_]
-    (comp (list "<OrAST ")
+    (comp (list "(or ")
           (flat-map clauses string-list)
-          (list ">")))
+          (list ")")))
 
   FileLineInfo
   (file-name [_] (extract (map (first clauses) file-name)))
