@@ -517,6 +517,15 @@
 (defn definition [sym value]
   (definition-ast sym value))
 
+(deftype JS-callable [sym]
+  Stringable
+  (string-list [_]
+    (list "(JS-callable " (str sym) ")"))
+
+  FileLineInfo
+  (file-name [_] (file-name sym))
+  (line-number [_] (line-number sym)))
+
 (def CodeAST (comp inline-ast
                    let-ast
                    and-ast
