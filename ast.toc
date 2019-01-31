@@ -189,7 +189,7 @@
   Stringable
   (string-list [_]
     (comp (list "(fn " (str (either fn-sym "")) " ")
-          (flat-map arities string-list)
+          (flat-map (seq arities) string-list)
           (list  ")")))
 
   FileLineInfo
@@ -274,7 +274,7 @@
   Stringable
   (string-list [_]
     (comp (list "(or ")
-          (flat-map clauses string-list)
+          (flat-map (seq clauses) string-list)
           (list ")")))
 
   FileLineInfo
@@ -317,53 +317,59 @@
                        (maybe sym)
                        "")))
 
-(defn assert-vector-of [type-sym sym]
-  ;; TODO: type-sym actually needs to be type-expr
-  (let [fn (file-name type-sym)
+(defn assert-vector-of [type-expr]
+  (let [fn (file-name type-expr)
         path (list [(either (and (= fn 'core)
                                    (maybe "$TOCCATA_DIR/core.toc"))
                               fn)
-                      (line-number type-sym)])]
-    (c/intersect (c/TypeConstraint {} path 'Vector (maybe sym) "")
-                 (c/InnerConstraint (c/TypeConstraint {} path type-sym nothing "")
-                                    path (maybe sym) ""))))
+                      (line-number type-expr)])]
+    (c/MultiConstraint [(c/TypeConstraint {} path 'Vector nothing "")
+                        (c/InnerConstraint (c/TypeConstraint {} path type-expr nothing "")
+                                           path nothing "")])))
 
-(defn assert-list-of [type-sym sym]
-  ;; TODO: this is wrong, 'sym' should not be in here
-  ;; TODO: type-sym actually needs to be type-expr
-  (let [fn (file-name type-sym)
+(def ListType (inline C Integer "(Value *)&(Integer){IntegerType, -1, ListType};"))
+
+(defn assert-list-of [type-expr]
+  (let [fn (file-name type-expr)
         path (list [(either (and (= fn 'core)
-                                   (maybe "$TOCCATA_DIR/core.toc"))
-                              fn)
-                      (line-number type-sym)])]
-    (c/intersect (c/TypeConstraint {} path 'List (maybe sym) "")
-                 (c/InnerConstraint (c/TypeConstraint {} path type-sym nothing "")
-                                    path (maybe sym) ""))))
-
-(def BitmapIndexedType (inline C Integer "(Value *)&(Integer){IntegerType, -1, BitmapIndexedType};"))
-(def ArrayNodeType (inline C Integer "(Value *)&(Integer){IntegerType, -1, ArrayNodeType};"))
-(def HashCollisionNodeType (inline C Integer "(Value *)&(Integer){IntegerType, -1, HashCollisionNodeType};"))
+                                 (maybe "$TOCCATA_DIR/core.toc"))
+                            fn)
+                    (line-number type-expr)])]
+    (c/MultiConstraint [(c/TypeConstraint {ListType #{}} path 'List nothing "")
+                        (c/InnerConstraint
+                         (either (instance? c/SymbolConstraints type-expr)
+                                 (c/TypeConstraint {} path type-expr nothing ""))
+                         empty-list nothing "")])))
 
 (defn assert-map-of [key-type val-type]
   ;; TODO: key-type and val-type actually need to be type-expr
-  (c/intersect (c/TypeConstraint {BitmapIndexedType #{}
-                                  ArrayNodeType #{}
-                                  HashCollisionNodeType #{}}
-                                 empty-list 'HashMap nothing "")
-               (c/InnerConstraint (c/TypeConstraint {} empty-list val-type nothing "")
-                                  empty-list nothing "")))
+  (c/MultiConstraint [(c/TypeConstraint {}
+                                        empty-list 'HashMap nothing "")
+                      (c/InnerConstraint (c/TypeConstraint {} empty-list val-type nothing "")
+                                         empty-list nothing "")]))
 
 (defn assert-type [type-sym sym]
-  (let [fn (file-name type-sym)]
-    (c/TypeConstraint {} (list [(either (and (= fn 'core)
-                                             (maybe "$TOCCATA_DIR/core.toc"))
-                                        fn)
-                                (line-number type-sym)])
-                      type-sym (maybe sym) "")))
+  (either (map (instance? c/Constraints type-sym)
+               (fn [constraint]
+                 (c/update-sym constraint sym)))
+          (let [fn (file-name type-sym)]
+            (c/TypeConstraint {} (list [(either (and (= fn 'core)
+                                                     (maybe "$TOCCATA_DIR/core.toc"))
+                                                fn)
+                                        (line-number type-sym)])
+                              type-sym (maybe sym) ""))))
 
 (defn assert-max-value [max sym]
   (let [fn (file-name sym)]
     (c/MaxValue max (list [(either (and (= fn 'core)
+                                        (maybe "$TOCCATA_DIR/core.toc"))
+                                   fn)
+                           (line-number sym)])
+                (maybe sym) "")))
+
+(defn assert-min-value [min sym]
+  (let [fn (file-name sym)]
+    (c/MinValue min (list [(either (and (= fn 'core)
                                         (maybe "$TOCCATA_DIR/core.toc"))
                                    fn)
                            (line-number sym)])
@@ -517,10 +523,10 @@
 (defn definition [sym value]
   (definition-ast sym value))
 
-(deftype JS-callable [sym]
+(deftype JS-callable [sym num-args]
   Stringable
   (string-list [_]
-    (list "(JS-callable " (str sym) ")"))
+    (list "(JS-callable " (str sym) ", " (str num-args) ")"))
 
   FileLineInfo
   (file-name [_] (file-name sym))
