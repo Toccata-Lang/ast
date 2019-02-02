@@ -331,7 +331,7 @@
                               fn)
                       (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {VectorType #{}} path 'Vector nothing "")
-                        (c/InnerConstraint
+                        (c/InferredInner
                          (either (instance? c/SymbolConstraints type-expr)
                                  (c/TypeConstraint {} path type-expr nothing ""))
                          empty-list nothing "")])))
@@ -343,7 +343,7 @@
                             fn)
                     (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {ListType #{}} path 'List nothing "")
-                        (c/InnerConstraint
+                        (c/InferredInner
                          (either (instance? c/SymbolConstraints type-expr)
                                  (c/TypeConstraint {} path type-expr nothing ""))
                          empty-list nothing "")])))
@@ -355,7 +355,7 @@
                             fn)
                     (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {MaybeType #{}} path 'Maybe nothing "")
-                        (c/InnerConstraint
+                        (c/InferredInner
                          (either (instance? c/SymbolConstraints type-expr)
                                  (c/TypeConstraint {} path type-expr nothing ""))
                          empty-list nothing "")])))
@@ -371,7 +371,7 @@
                                            HashCollisionNodeType #{}}
                                           path 'HashMap nothing "")
                         ;; TODO: add key constraint
-                        (c/InnerConstraint
+                        (c/InferredInner
                          (either (instance? c/SymbolConstraints val-type)
                                  (c/TypeConstraint {} path val-type nothing ""))
                          empty-list nothing "")])))
