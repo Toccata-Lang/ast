@@ -159,9 +159,11 @@
   (declaration-ast sym))
 
 
-(deftype fn-arity-ast [fn-sym fn-var params doc body]
+(deftype fn-arity-ast [fn-sym fn-var params doc body param-consts result-const]
   (assert (instance? params-ast params))
   (assert (instance? Vector body))
+  (assert (instance? Vector param-consts))
+  (assert (instance? c/ValueConstraint result-const))
 
   Stringable
   (string-list [_] (comp (list "(")
@@ -175,7 +177,7 @@
   (line-number [_] (line-number body)))
 
 (defn fn-arity [params doc body]
-  (fn-arity-ast "" "" params doc body))
+  (fn-arity-ast "" "" params doc body [] c/top-type))
 
 
 (deftype fn-ast [fn-sym arities]
