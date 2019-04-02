@@ -10,7 +10,8 @@
   (file-name [ast]
     (assert-result x (instance? SymbolOrString x))
     "")
-  (line-number [ast] 0))
+  (line-number [ast]
+    0))
 
 (extend-type List
   FileLineInfo
@@ -90,7 +91,8 @@
   (assert (instance? Integer line-num))
 
   Stringable
-  (string-list [_] (list "<InlineAST>"))
+  (string-list [_]
+    (list "(inline " (str lang) " " (str (either result-type "")) " \"" txt "\")"))
 
   FileLineInfo
   (file-name [_] path-to-file)
@@ -544,7 +546,10 @@
   ;; (assert (instance? Symbol sym))
 
   Stringable
-  (string-list [_] (list "<DefAST " (str sym) ">"))
+  (string-list [_]
+    (comp (list "(def " (str sym) "\n")
+          (interpose (map value-exprs str) "\n")
+          (list ")")))
 
   FileLineInfo
   (file-name [_] (file-name sym))
