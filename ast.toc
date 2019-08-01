@@ -314,6 +314,7 @@
   (let [fn (file-name sym)]
     ;; TODO: what was I thinking doing it this way. (Actually, I know.)
     (c/ItemsConstraint (repeat len c/top-type)
+                       c/top-type
                        (list [(either (and (= fn 'core)
                                            (maybe "$TOCCATA_DIR/core.toc"))
                                       fn)
@@ -335,9 +336,9 @@
                               fn)
                       (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {VectorType #{}} path 'Vector nothing "")
-                        (c/InferredInner
-                         (either (instance? c/SymbolConstraints type-expr)
-                                 (c/TypeConstraint {} path type-expr nothing ""))
+                        (c/CollectionOf
+                         [(either (instance? c/SymbolConstraints type-expr)
+                                   (c/TypeConstraint {} path type-expr nothing ""))]
                          empty-list nothing "")])))
 
 (defn assert-list-of [type-expr]
@@ -347,9 +348,9 @@
                             fn)
                     (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {ListType #{}} path 'List nothing "")
-                        (c/InferredInner
-                         (either (instance? c/SymbolConstraints type-expr)
-                                 (c/TypeConstraint {} path type-expr nothing ""))
+                        (c/CollectionOf
+                         [(either (instance? c/SymbolConstraints type-expr)
+                                   (c/TypeConstraint {} path type-expr nothing ""))]
                          empty-list nothing "")])))
 
 (defn assert-maybe-of [type-expr]
@@ -359,9 +360,9 @@
                             fn)
                     (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {MaybeType #{}} path 'Maybe nothing "")
-                        (c/InferredInner
-                         (either (instance? c/SymbolConstraints type-expr)
-                                 (c/TypeConstraint {} path type-expr nothing ""))
+                        (c/CollectionOf
+                         [(either (instance? c/SymbolConstraints type-expr)
+                                   (c/TypeConstraint {} path type-expr nothing ""))]
                          empty-list nothing "")])))
 
 (defn assert-map-of [key-type val-type]
@@ -375,9 +376,9 @@
                                            HashCollisionNodeType #{}}
                                           path 'HashMap nothing "")
                         ;; TODO: add key constraint
-                        (c/InferredInner
-                         (either (instance? c/SymbolConstraints val-type)
-                                 (c/TypeConstraint {} path val-type nothing ""))
+                        (c/CollectionOf
+                         [(either (instance? c/SymbolConstraints val-type)
+                                   (c/TypeConstraint {} path val-type nothing ""))]
                          empty-list nothing "")])))
 
 (defn assert-type [type-sym sym]
@@ -480,7 +481,7 @@
   (assert (instance? HashMap impls))
 
   Stringable
-  (string-list [_] (list "<Reify>"))
+  (string-list [_] (list "(reify " (str type-num " \n" impls) ")"))
 
   FileLineInfo
   (file-name [_] (file-name impls))
@@ -581,5 +582,5 @@
                    Integer))
 
 (def NoCode (comp c/ResultConstraint
-                  ast/block-comment-ast
+                  block-comment-ast
                   c/SymbolConstraints))
