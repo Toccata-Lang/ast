@@ -337,20 +337,16 @@
                       (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {VectorType #{}} path 'Vector nothing "")
                         (c/CollectionOf
-                         [(either (instance? c/SymbolConstraints type-expr)
-                                   (c/TypeConstraint {} path type-expr nothing ""))]
+                         (either (instance? c/SymbolConstraints type-expr)
+                                 (c/TypeConstraint {} path type-expr nothing ""))
                          empty-list nothing "")])))
 
 (defn assert-list-of [type-expr]
-  (let [fn (file-name type-expr)
-        path (list [(either (and (= fn 'core)
-                                 (maybe "$TOCCATA_DIR/core.toc"))
-                            fn)
-                    (line-number type-expr)])]
+  (let [path (list [(file-name type-expr) (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {ListType #{}} path 'List nothing "")
                         (c/CollectionOf
-                         [(either (instance? c/SymbolConstraints type-expr)
-                                   (c/TypeConstraint {} path type-expr nothing ""))]
+                         (either (instance? c/SymbolConstraints type-expr)
+                                 (c/TypeConstraint {} path type-expr nothing ""))
                          empty-list nothing "")])))
 
 (defn assert-maybe-of [type-expr]
@@ -361,8 +357,8 @@
                     (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {MaybeType #{}} path 'Maybe nothing "")
                         (c/CollectionOf
-                         [(either (instance? c/SymbolConstraints type-expr)
-                                   (c/TypeConstraint {} path type-expr nothing ""))]
+                         (either (instance? c/SymbolConstraints type-expr)
+                                 (c/TypeConstraint {} path type-expr nothing ""))
                          empty-list nothing "")])))
 
 (defn assert-map-of [key-type val-type]
@@ -377,8 +373,8 @@
                                           path 'HashMap nothing "")
                         ;; TODO: add key constraint
                         (c/CollectionOf
-                         [(either (instance? c/SymbolConstraints val-type)
-                                   (c/TypeConstraint {} path val-type nothing ""))]
+                         (either (instance? c/SymbolConstraints val-type)
+                                 (c/TypeConstraint {} path val-type nothing ""))
                          empty-list nothing "")])))
 
 (defn assert-type [type-sym sym]
