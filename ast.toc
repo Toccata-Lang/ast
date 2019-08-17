@@ -229,7 +229,7 @@
 
   Stringable
   (string-list [_]
-    (list (str binding) " " (str val) "\n"))
+    (list (str binding) " " (str val)))
 
   FileLineInfo
   (file-name [_] (file-name binding))
@@ -244,7 +244,7 @@
 
   Stringable
   (string-list [_]
-    (list "(let " (str bindings) "\n" (apply str (interpose body "\n")) ")"))
+    (list "(let [" (to-str (interpose bindings "\n")) "]\n" (apply str (interpose body "\n")) ")"))
 
   FileLineInfo
   (file-name [_] (file-name body))
