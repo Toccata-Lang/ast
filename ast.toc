@@ -462,7 +462,13 @@
 (deftype quoted-ast [q-val]
   Stringable
   (string-list [_]
-    (list "'" (str q-val)))
+    (list (str "'" q-val)))
+
+  Ord
+  (<* [x y]
+    (assert (instance? quoted-ast y))
+    (and (< q-val (.q-val x))
+         (maybe x)))
 
   FileLineInfo
   (file-name [_] (file-name q-val))
@@ -563,7 +569,6 @@
   FileLineInfo
   (file-name [_] (file-name sym))
   (line-number [_] (line-number sym)))
-
 (def CodeAST (comp inline-ast
                    let-ast
                    and-ast
@@ -573,6 +578,8 @@
                    reify-ast
                    call-ast
                    fn-ast
+                   string-ast
+                   integer-ast
                    Symbol
                    String
                    Integer))
