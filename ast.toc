@@ -322,6 +322,28 @@
                        (maybe sym)
                        "")))
 
+(deftype value-of-ast [type-exprs sym]
+  (assert (instance? Maybe sym))
+
+  Stringable
+  (string-list [ast]
+    (list "<value-of at " (file-name ast) " " (str (line-number ast)) "\n" (str type-exprs ">")))
+
+  c/Constraint
+  (c/update-sym [_ new-sym]
+    (value-of-ast type-exprs (maybe new-sym)))
+
+  FileLineInfo
+  (file-name [c]
+    (either (map (first type-exprs) file-name)
+            ""))
+  (line-number [c]
+    (either (map (first type-exprs) line-number)
+            0)))
+
+(defn value-of [type-exprs]
+  (value-of-ast type-exprs nothing))
+
 (def MaybeType (inline C Integer "(Value *)&(Integer){IntegerType, -1, MaybeType};"))
 (def VectorType (inline C Integer "(Value *)&(Integer){IntegerType, -1, VectorType};"))
 (def ListType (inline C Integer "(Value *)&(Integer){IntegerType, -1, ListType};"))
@@ -339,7 +361,7 @@
                         (c/CollectionOf
                          (either (instance? c/SymbolConstraints type-expr)
                                  (c/TypeConstraint {} path type-expr nothing ""))
-                         empty-list nothing "")])))
+                         path nothing "")])))
 
 (defn assert-list-of [type-expr]
   (let [path (list [(file-name type-expr) (line-number type-expr)])]
@@ -347,7 +369,7 @@
                         (c/CollectionOf
                          (either (instance? c/SymbolConstraints type-expr)
                                  (c/TypeConstraint {} path type-expr nothing ""))
-                         empty-list nothing "")])))
+                         path nothing "")])))
 
 (defn assert-maybe-of [type-expr]
   (let [fn (file-name type-expr)
@@ -359,7 +381,7 @@
                         (c/CollectionOf
                          (either (instance? c/SymbolConstraints type-expr)
                                  (c/TypeConstraint {} path type-expr nothing ""))
-                         empty-list nothing "")])))
+                         path nothing "")])))
 
 (defn assert-map-of [key-type val-type]
   (let [fn (file-name key-type)
@@ -375,18 +397,15 @@
                         (c/CollectionOf
                          (either (instance? c/SymbolConstraints val-type)
                                  (c/TypeConstraint {} path val-type nothing ""))
-                         empty-list nothing "")])))
+                         path nothing "")])))
 
-(defn assert-type [type-sym sym]
-  (either (map (instance? c/Constraints type-sym)
-               (fn [constraint]
-                 (c/update-sym constraint sym)))
-          (let [fn (file-name type-sym)]
-            (c/TypeConstraint {} (list [(either (and (= fn 'core)
-                                                     (maybe "$TOCCATA_DIR/core.toc"))
-                                                fn)
-                                        (line-number type-sym)])
-                              type-sym (maybe sym) ""))))
+(defn assert-type [type-sym]
+  (let [fn (file-name type-sym)]
+    (c/TypeConstraint {} (list [(either (and (= fn 'core)
+                                             (maybe "$TOCCATA_DIR/core.toc"))
+                                        fn)
+                                (line-number type-sym)])
+                      type-sym nothing "")))
 
 (defn assert-max-value [max sym]
   (let [fn (file-name sym)]
