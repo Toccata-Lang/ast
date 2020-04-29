@@ -314,35 +314,13 @@
   (let [fn (file-name sym)]
     ;; TODO: what was I thinking doing it this way. (Actually, I know.)
     (c/ItemsConstraint (repeat len c/top-type)
-                       c/top-type
+                       c/coll-of-any
                        (list [(either (and (= fn 'core)
                                            (maybe "$TOCCATA_DIR/core.toc"))
                                       fn)
                               (line-number sym)])
                        (maybe sym)
                        "")))
-
-(deftype value-of-ast [type-exprs sym]
-  (assert (instance? Maybe sym))
-
-  Stringable
-  (string-list [ast]
-    (list "<value-of at " (file-name ast) " " (str (line-number ast)) "\n" (str type-exprs ">")))
-
-  c/Constraint
-  (c/update-sym [_ new-sym]
-    (value-of-ast type-exprs (maybe new-sym)))
-
-  FileLineInfo
-  (file-name [c]
-    (either (map (first type-exprs) file-name)
-            ""))
-  (line-number [c]
-    (either (map (first type-exprs) line-number)
-            0)))
-
-(defn value-of [type-exprs]
-  (value-of-ast type-exprs nothing))
 
 (def MaybeType (inline C Integer "(Value *)&(Integer){IntegerType, -1, MaybeType};"))
 (def VectorType (inline C Integer "(Value *)&(Integer){IntegerType, -1, VectorType};"))
@@ -406,6 +384,16 @@
                                         fn)
                                 (line-number type-sym)])
                       type-sym nothing "")))
+
+(defn any-of [type-exprs]
+  (assert (instance? (vector-of Symbol) type-exprs))
+
+  (c/SumConstraint (map type-exprs assert-type)
+                   (either (map (first type-exprs) (fn [c]
+                                                     (list [(file-name c) (line-number c)])))
+                           empty-list)
+                   nothing
+                   ""))
 
 (defn assert-max-value [max sym]
   (let [fn (file-name sym)]
