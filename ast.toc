@@ -3,8 +3,8 @@
                           "constraints.toc"
                           :sha "4529b1f"))
 
-(def SymbolOrString (comp Symbol
-                          String))
+(def SymbolOrString (any-of Symbol
+                            String))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -220,8 +220,8 @@
 (defn call-expr [[target & args]]
   (call-ast target (vec args)))
 
-(def BindingTarget (comp Symbol
-                         params-ast))
+(def BindingTarget (any-of Symbol
+                           params-ast))
 
 (deftype binding-ast [binding val]
   ;; TODO
@@ -332,12 +332,12 @@
 (defn assert-vector-of [type-expr]
   (let [fn (file-name type-expr)
         path (list [(either (and (= fn 'core)
-                                   (maybe "$TOCCATA_DIR/core.toc"))
-                              fn)
-                      (line-number type-expr)])]
+                                 (maybe "$TOCCATA_DIR/core.toc"))
+                            fn)
+                    (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {VectorType #{}} path 'Vector nothing "")
                         (c/CollectionOf
-                         (either (instance? c/SymbolConstraints type-expr)
+                         (either (instance? c/ValueConstraint type-expr)
                                  (c/TypeConstraint {} path type-expr nothing ""))
                          path nothing "")])))
 
@@ -345,7 +345,7 @@
   (let [path (list [(file-name type-expr) (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {ListType #{}} path 'List nothing "")
                         (c/CollectionOf
-                         (either (instance? c/SymbolConstraints type-expr)
+                         (either (instance? c/ValueConstraint type-expr)
                                  (c/TypeConstraint {} path type-expr nothing ""))
                          path nothing "")])))
 
@@ -357,7 +357,7 @@
                     (line-number type-expr)])]
     (c/MultiConstraint [(c/TypeConstraint {MaybeType #{}} path 'Maybe nothing "")
                         (c/CollectionOf
-                         (either (instance? c/SymbolConstraints type-expr)
+                         (either (instance? c/ValueConstraint type-expr)
                                  (c/TypeConstraint {} path type-expr nothing ""))
                          path nothing "")])))
 
@@ -367,13 +367,11 @@
                                  (maybe "$TOCCATA_DIR/core.toc"))
                             fn)
                     (line-number key-type)])]
-    (c/MultiConstraint [(c/TypeConstraint {BitmapIndexedType #{}
-                                           ArrayNodeType #{}
-                                           HashCollisionNodeType #{}}
-                                          path 'HashMap nothing "")
-                        ;; TODO: add key constraint
+    (c/MultiConstraint [(c/KeysConstraint (either (instance? c/ValueConstraint key-type)
+                                                  (c/TypeConstraint {} path key-type nothing ""))
+                                          path nothing "")
                         (c/CollectionOf
-                         (either (instance? c/SymbolConstraints val-type)
+                         (either (instance? c/ValueConstraint val-type)
                                  (c/TypeConstraint {} path val-type nothing ""))
                          path nothing "")])))
 
@@ -576,21 +574,21 @@
   FileLineInfo
   (file-name [_] (file-name sym))
   (line-number [_] (line-number sym)))
-(def CodeAST (comp inline-ast
-                   let-ast
-                   and-ast
-                   or-ast
-                   either-ast
-                   quoted-ast
-                   reify-ast
-                   call-ast
-                   fn-ast
-                   string-ast
-                   integer-ast
-                   Symbol
-                   String
-                   Integer))
+(def CodeAST (any-of inline-ast
+                     let-ast
+                     and-ast
+                     or-ast
+                     either-ast
+                     quoted-ast
+                     reify-ast
+                     call-ast
+                     fn-ast
+                     string-ast
+                     integer-ast
+                     Symbol
+                     String
+                     Integer))
 
-(def NoCode (comp c/ResultConstraint
-                  block-comment-ast
-                  c/SymbolConstraints))
+(def NoCode (any-of c/ResultConstraint
+                    block-comment-ast
+                    c/SymbolConstraints))
