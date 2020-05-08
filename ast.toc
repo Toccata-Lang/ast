@@ -6,12 +6,38 @@
 (def SymbolOrString (any-of Symbol
                             String))
 
+(deftype Location [file line]
+  (assert (instance? SymbolOrString file))
+  (assert (instance? Integer line))
+
+  Stringable
+  (string-list [_]
+    (list (either (and (= file 'core)
+                       (maybe "$TOCCATA_DIR/core.toc"))
+                  (str file))
+          ", " (str line))))
+
 (defprotocol FileLineInfo
   (file-name [ast]
     (assert-result x (instance? SymbolOrString x))
     "")
+
   (line-number [ast]
     0))
+
+;; TODO: combine with FileLineInfo
+(defprotocol FileLoc
+  (location [ast]
+    (Location (file-name ast) (line-number ast))))
+
+(extend-type Location
+  FileLineInfo
+  (file-name [ast]
+    (assert-result x (instance? SymbolOrString x))
+    (.file ast))
+
+  (line-number [ast]
+    (.line ast)))
 
 (extend-type List
   FileLineInfo
@@ -309,105 +335,6 @@
   FileLineInfo
   (file-name [c] (file-name (.type-sym c)))
   (line-number [c] (line-number (.type-sym c))))
-
-(defn assert-min-count [sym len]
-  (let [fn (file-name sym)]
-    ;; TODO: what was I thinking doing it this way. (Actually, I know.)
-    (c/ItemsConstraint (repeat len c/top-type)
-                       c/coll-of-any
-                       (list [(either (and (= fn 'core)
-                                           (maybe "$TOCCATA_DIR/core.toc"))
-                                      fn)
-                              (line-number sym)])
-                       (maybe sym)
-                       "")))
-
-(def MaybeType (inline C Integer "(Value *)&(Integer){IntegerType, -1, MaybeType};"))
-(def VectorType (inline C Integer "(Value *)&(Integer){IntegerType, -1, VectorType};"))
-(def ListType (inline C Integer "(Value *)&(Integer){IntegerType, -1, ListType};"))
-(def BitmapIndexedType (inline C Integer "(Value *)&(Integer){IntegerType, -1, BitmapIndexedType};"))
-(def ArrayNodeType (inline C Integer "(Value *)&(Integer){IntegerType, -1, ArrayNodeType};"))
-(def HashCollisionNodeType (inline C Integer "(Value *)&(Integer){IntegerType, -1, HashCollisionNodeType};"))
-
-(defn assert-vector-of [type-expr]
-  (let [fn (file-name type-expr)
-        path (list [(either (and (= fn 'core)
-                                 (maybe "$TOCCATA_DIR/core.toc"))
-                            fn)
-                    (line-number type-expr)])]
-    (c/MultiConstraint [(c/TypeConstraint {VectorType #{}} path 'Vector nothing "")
-                        (c/CollectionOf
-                         (either (instance? c/ValueConstraint type-expr)
-                                 (c/TypeConstraint {} path type-expr nothing ""))
-                         path nothing "")])))
-
-(defn assert-list-of [type-expr]
-  (let [path (list [(file-name type-expr) (line-number type-expr)])]
-    (c/MultiConstraint [(c/TypeConstraint {ListType #{}} path 'List nothing "")
-                        (c/CollectionOf
-                         (either (instance? c/ValueConstraint type-expr)
-                                 (c/TypeConstraint {} path type-expr nothing ""))
-                         path nothing "")])))
-
-(defn assert-maybe-of [type-expr]
-  (let [fn (file-name type-expr)
-        path (list [(either (and (= fn 'core)
-                                 (maybe "$TOCCATA_DIR/core.toc"))
-                            fn)
-                    (line-number type-expr)])]
-    (c/MultiConstraint [(c/TypeConstraint {MaybeType #{}} path 'Maybe nothing "")
-                        (c/CollectionOf
-                         (either (instance? c/ValueConstraint type-expr)
-                                 (c/TypeConstraint {} path type-expr nothing ""))
-                         path nothing "")])))
-
-(defn assert-map-of [key-type val-type]
-  (let [fn (file-name key-type)
-        path (list [(either (and (= fn 'core)
-                                 (maybe "$TOCCATA_DIR/core.toc"))
-                            fn)
-                    (line-number key-type)])]
-    (c/MultiConstraint [(c/KeysConstraint (either (instance? c/ValueConstraint key-type)
-                                                  (c/TypeConstraint {} path key-type nothing ""))
-                                          path nothing "")
-                        (c/CollectionOf
-                         (either (instance? c/ValueConstraint val-type)
-                                 (c/TypeConstraint {} path val-type nothing ""))
-                         path nothing "")])))
-
-(defn assert-type [type-sym]
-  (let [fn (file-name type-sym)]
-    (c/TypeConstraint {} (list [(either (and (= fn 'core)
-                                             (maybe "$TOCCATA_DIR/core.toc"))
-                                        fn)
-                                (line-number type-sym)])
-                      type-sym nothing "")))
-
-(defn any-of [type-exprs]
-  (assert (instance? (vector-of Symbol) type-exprs))
-
-  (c/SumConstraint (map type-exprs assert-type)
-                   (either (map (first type-exprs) (fn [c]
-                                                     (list [(file-name c) (line-number c)])))
-                           empty-list)
-                   nothing
-                   ""))
-
-(defn assert-max-value [max sym]
-  (let [fn (file-name sym)]
-    (c/MaxValue max (list [(either (and (= fn 'core)
-                                        (maybe "$TOCCATA_DIR/core.toc"))
-                                   fn)
-                           (line-number sym)])
-                (maybe sym) "")))
-
-(defn assert-min-value [min sym]
-  (let [fn (file-name sym)]
-    (c/MinValue min (list [(either (and (= fn 'core)
-                                        (maybe "$TOCCATA_DIR/core.toc"))
-                                   fn)
-                           (line-number sym)])
-                (maybe sym) "")))
 
 
 (defn result-expr [sym assertion]
