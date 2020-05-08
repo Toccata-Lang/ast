@@ -64,6 +64,20 @@
   (line-number [m]
     (line-number (seq m))))
 
+(deftype assert-ast [constraint loc]
+  (assert (instance? c/ValueConstraint constraint))
+  (assert (instance? Location loc))
+
+  FileLineInfo
+  (file-name [ast]
+    (file-name loc))
+
+  (line-number [ast]
+    (line-number loc)))
+
+(defn make-assertion [constraint file line]
+  (assert-ast constraint (Location file line)))
+
 (deftype block-comment-ast [lines path-to-file line-num]
   (assert (instance? Vector lines))
   (assert (instance? SymbolOrString path-to-file))
@@ -111,7 +125,7 @@
 (deftype inline-ast [lang result-type txt path-to-file line-num]
   ;; TODO
   ;; (assert (instance? Symbol lang))
-  (assert (instance? Maybe result-type))
+  (assert (instance? (maybe-of assert-ast) result-type))
   (assert (instance? String txt))
   (assert (instance? SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
@@ -441,7 +455,6 @@
 (defn type-expr [sym fields impls]
   (type-ast sym fields impls))
 
-
 (deftype module-ast [file-path]
   (assert (instance? String file-path)))
 
@@ -518,4 +531,5 @@
 
 (def NoCode (any-of c/ResultConstraint
                     block-comment-ast
+                    assert-ast
                     c/SymbolConstraints))
