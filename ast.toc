@@ -39,42 +39,16 @@
   (line-number [ast]
     (.line ast)))
 
-;; we tag symbols with file/line for use later
-(defprotocol Tagged
-  (namespace [s]
-    (assert-result r (instance? (maybe-of Symbol) r))
-
-    nothing)
-
-  (tag [s] (tag s "" 0))
-
-  (tag [s file line])
-
-  (untag [x]
-    (assert-result r (instance? Symbol r))))
-
 (deftype tagged-symbol [ns base sym file line]
   (assert (instance? SymbolOrString file))
   (assert (instance? (maybe-of Symbol) ns))
   (assert (instance? Symbol sym))
   (assert (instance? Symbol base))
   (assert (instance? Integer line))
-  
+
   FileLineInfo
   (file-name [s] file)
   (line-number [s] line)
-
-  Tagged
-  (namespace [s] ns)
-  (tag [s] s)
-  (tag [s new-file new-line]
-    (tagged-symbol ns base sym new-file new-line))
-  (untag [_] base)
-
-  Stringable
-  (string-list [_]
-    (list (either (map ns (fn [ns-str] (str ns-str "/" (untag base))))
-                  (str (untag base)))))
 
   Hashable
   (sha1 [_] (sha1 base))
@@ -84,6 +58,37 @@
 
   Eq
   (=* [_ x] (=* x base)))
+
+;; we tag symbols with file/line for use later
+(defprotocol Tagged
+  (namespace [s]
+    (assert-result r (instance? (maybe-of Symbol) r))
+
+    nothing)
+
+  (tag [s]
+    (assert-result r (instance? tagged-symbol r))
+
+    (tag s "" 0))
+
+  (tag [s file line]
+   (assert-result r (instance? tagged-symbol r)))
+
+  (untag [x]
+    (assert-result r (instance? Symbol r))))
+
+(extend-type tagged-symbol
+  Stringable
+  (string-list [s]
+    (list (either (map (.ns s) (fn [ns-str] (str ns-str "/" (untag (.base s)))))
+                  (str (untag (.base s))))))
+  
+  Tagged
+  (namespace [s] (.ns s))
+  (tag [s] s)
+  (tag [s new-file new-line]
+    (tagged-symbol (.ns s) (.base s) (.sym s) new-file new-line))
+  (untag [s] (.base s)))
 
 (extend-type String
   Tagged
@@ -102,13 +107,6 @@
   (tag [s file line]
     (tagged-symbol nothing s s file line))
   (untag [s] s))
-
-;; It's useful to be able to tag lists of symbols
-(extend-type List
-  Tagged
-  (tag [l file line]
-    (map l (fn [x]
-             (tag x file line)))))
 
 (extend-type List
   FileLineInfo
