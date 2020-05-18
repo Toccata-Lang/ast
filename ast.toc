@@ -176,10 +176,8 @@
   (file-name [_] path-to-file)
   (line-number [_] line-num))
 
-
 (deftype inline-ast [lang result-type txt path-to-file line-num]
-  ;; TODO
-  ;; (assert (instance? Symbol lang))
+  (assert (instance? tagged-symbol lang))
   (assert (instance? (maybe-of tagged-symbol) result-type))
   (assert (instance? String txt))
   (assert (instance? SymbolOrString path-to-file))
@@ -320,12 +318,11 @@
 (defn call-expr [[target & args]]
   (call-ast target (vec args)))
 
-(def BindingTarget (any-of Symbol
+(def BindingTarget (any-of tagged-symbol
                            params-ast))
 
 (deftype binding-ast [binding val]
-  ;; TODO
-  ;; (assert (instance? BindingTarget binding))
+  (assert (instance? BindingTarget binding))
 
   Stringable
   (string-list [_]
@@ -411,8 +408,7 @@
   (line-number [c] (line-number (.type-sym c))))
 
 
-(defn result-expr [sym assertion]
-  ;; TODO: no longer need 'sym'
+(defn result-expr [assertion]
   (c/ResultConstraint assertion))
 
 
@@ -433,8 +429,7 @@
 
 
 (deftype protocol-ast [protocol-sym prototypes]
-  ;; TODO
-  ;; (assert (instance? Symbol protocol-sym))
+  (assert (instance? tagged-symbol protocol-sym))
   (assert (instance? Vector prototypes))
 
   Stringable
@@ -449,8 +444,7 @@
 
 
 (deftype extend-ast [type impls]
-  ;; TODO
-  ;; (assert (instance? Symbol type))
+  (assert (instance? tagged-symbol type))
   (assert (instance? HashMap impls))
 
   Stringable
@@ -500,8 +494,7 @@
 
 
 (deftype type-ast [sym fields impls]
-  ;; TODO
-  ;; (assert (instance? Symbol sym))
+  (assert (instance? tagged-symbol sym))
   (assert (instance? params-ast fields))
   (assert (instance? Vector impls))
 
@@ -536,8 +529,7 @@
 
 
 (deftype add-ns-ast [ns-sym mod]
-  ;; TODO
-  ;; (assert (instance? Symbol ns-sym))
+  (assert (instance? tagged-symbol ns-sym))
 
   Stringable
   (string-list [_] (list "<AddNS " (str ns-sym) ">"))
@@ -550,8 +542,7 @@
   (add-ns-ast ns mod))
 
 (deftype definition-ast [sym value-exprs]
-  ;; TODO
-  ;; (assert (instance? Symbol sym))
+  (assert (instance? tagged-symbol sym))
 
   Stringable
   (string-list [_]
@@ -591,4 +582,4 @@
 
 (def NoCode (any-of c/ResultConstraint
                     block-comment-ast
-                    c/SymbolConstraints))
+                    c/ValueConstraint))
