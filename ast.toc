@@ -352,8 +352,9 @@
 
 
 (deftype and-ast [clauses]
-  (assert (instance? Vector clauses))
-  (assert (min-count clauses 1))
+  (assert (instance? (all-of Vector
+                             (min-count 1))
+                     clauses))
 
   Stringable
   (string-list [_]
@@ -492,6 +493,42 @@
 (defn reified [type-num impls]
   (reify-ast type-num impls))
 
+(deftype cond-val-ast [conditional value]
+  Stringable
+  (string-list [_]
+    (list (str conditional " " value)))
+
+  FileLineInfo
+  (file-name [ast]
+    (file-name conditional))
+
+  (line-number [ast]
+    (line-number conditional)))
+
+(defn cond-val-expr [conditional value]
+  (cond-val-ast conditional value))
+
+(deftype cond-ast [conditionals default]
+  ;; TODO: re-enable eventually
+  ;; (assert (instance? (all-of (vector-of cond-val-ast)
+  ;;                            (min-count 1))
+  ;;                    conditionals))
+
+  Stringable
+  (string-list [_]
+    (list "(cond " (to-str (flat-map conditionals (fn [c-v]
+                                                    [(str c-v) "\n"])))
+          (str default) ")\n"))
+
+  FileLineInfo
+  (file-name [ast]
+    (file-name conditionals))
+
+  (line-number [ast]
+    (line-number conditionals)))
+
+(defn cond-expr [conditionals default]
+  (cond-ast conditionals default))
 
 (deftype type-ast [sym fields impls]
   (assert (instance? tagged-symbol sym))
@@ -565,6 +602,7 @@
   FileLineInfo
   (file-name [_] (file-name sym))
   (line-number [_] (line-number sym)))
+
 (def CodeAST (any-of inline-ast
                      let-ast
                      and-ast
