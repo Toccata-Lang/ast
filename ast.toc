@@ -108,22 +108,21 @@
     (tagged-symbol nothing s s file line))
   (untag [s] s))
 
-(extend-type List
-  FileLineInfo
-  (file-name [l]
-    (either (map (first l) file-name)
-            ""))
-  (line-number [l]
-    (either (map (first l) line-number)
-            0)))
-
-(extend-type Vector
+(extend-type Sequence
   FileLineInfo
   (file-name [v]
-    (either (map (first v) file-name)
+    (either (map (some v (fn [x]
+                           (let [file (file-name x)]
+                             (or (= file 'core)
+                                 (first file)))))
+                 file-name)
             ""))
   (line-number [v]
-    (either (map (first v) line-number)
+    (either (map (some v (fn [x]
+                           (let [file (file-name x)]
+                             (or (= file 'core)
+                                 (first file)))))
+                 line-number)
             0)))
 
 (extend-type HashMap
@@ -266,11 +265,9 @@
   (assert (instance? c/ValueConstraint result-const))
 
   Stringable
-  (string-list [_] (comp (list "(")
-                         (string-list params)
+  (string-list [_] (comp (string-list params)
                          (list "\n")
-                         (flat-map (interpose body "\n") string-list)
-                         (list ")")))
+                         (flat-map (interpose body "\n") string-list)))
 
   FileLineInfo
   (file-name [_] (file-name body))
@@ -290,11 +287,16 @@
 
   Stringable
   (string-list [_]
-    (comp (list "(fn " (str (either fn-sym "")) " ")
-          (flat-map (seq arities) string-list)
+    (comp (list "(fn" (str (either fn-sym "")) " ")
+          (cond (= 1 (count arities))
+                (flat-map (seq arities) string-list)
+                (flat-map (seq arities) (fn [arity]
+                                          (comp (list "(")
+                                                (string-list arity)
+                                                (list ")")))))
           (list  ")")))
 
-  FileLineInfo
+ FileLineInfo
   (file-name [_] (file-name arities))
   (line-number [_] (line-number arities)))
 
@@ -403,11 +405,138 @@
 (defn either-expr [clause alt]
   (either-ast clause alt))
 
+(defn file-name-from-path [path]
+  (map (last path)
+       (fn [[file]] file)))
+
+(defn line-number-from-path [path]
+  (map (last path)
+       (fn [[_ ln]] ln)))
+
 (extend-type c/TypeConstraint
   FileLineInfo
-  (file-name [c] (file-name (.type-sym c)))
-  (line-number [c] (line-number (.type-sym c))))
+  (file-name [c]
+    (let [file (file-name (.type-sym c))]
+      (either (or (= file 'core)
+                  (and (empty? file)
+                       (file-name-from-path (.path c))))
+              file)))
 
+  (line-number [c]
+    (let [ln (line-number (.type-sym c))]
+      (either (and (= 0 ln)
+                   (line-number-from-path (.path c)))
+              ln))))
+
+(extend-type c/NoValues
+  FileLineInfo
+  (file-name [c] (file-name (.constraints c)))
+  (line-number [c] (line-number (.constraints c))))
+
+(extend-type c/MultiConstraint
+  FileLineInfo
+  (file-name [c] (file-name (.constraints c)))
+  (line-number [c] (line-number (.constraints c))))
+
+(extend-type c/InferredInner
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            (file-name (.contents c))))
+  (line-number [c] 0))
+
+(extend-type c/CollectionOf
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            (file-name (.contents c))))
+  (line-number [c] 0))
+
+(extend-type c/ItemsConstraint
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            (file-name (.items-constraints c))))
+  (line-number [c] 0))
+
+(extend-type c/FieldConstraint
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            ""))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            0)))
+
+(extend-type c/StaticIntConstraint
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            ""))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            0)))
+
+(extend-type c/MinValue
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            ""))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            0)))
+
+(extend-type c/MaxValue
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            ""))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            0)))
+
+(extend-type c/StaticLengthConstraint
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            ""))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            0)))
+
+(extend-type c/StaticStrConstraint
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            ""))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            0)))
+
+(extend-type c/SumConstraint
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            (file-name (.alts c))))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            (line-number (.alts c)))))
+
+(extend-type c/KeysConstraint
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            (file-name (.constraint c))))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            (line-number (.constraint c)))))
+
+(extend-type c/ResultConstraint
+  FileLineInfo
+  (file-name [c]
+    (file-name (.assertion c)))
+  (line-number [c]
+    (line-number (.assertion c))))
 
 (defn result-expr [assertion]
   (c/ResultConstraint assertion))
