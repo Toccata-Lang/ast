@@ -1,7 +1,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "4529b1f"))
+                          :sha "54d3fc9"))
 
 (def SymbolOrString (any-of Symbol
                             String))
@@ -338,7 +338,7 @@
   (binding-ast binding val))
 
 (deftype let-ast [bindings body]
-  (assert (instance? Vector bindings))
+  (assert (instance? (vector-of binding-ast) bindings))
   (assert (instance? Vector body))
 
   Stringable
@@ -638,10 +638,9 @@
   (cond-val-ast conditional value))
 
 (deftype cond-ast [conditionals default]
-  ;; TODO: re-enable eventually
-  ;; (assert (instance? (all-of (vector-of cond-val-ast)
-  ;;                            (min-count 1))
-  ;;                    conditionals))
+  (assert (instance? (all-of (vector-of cond-val-ast)
+                             (min-count 1))
+                     conditionals))
 
   Stringable
   (string-list [_]
