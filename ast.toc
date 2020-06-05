@@ -39,6 +39,21 @@
   (line-number [ast]
     (.line ast)))
 
+;; we tag symbols with file/line for use later
+(defprotocol Tagged
+  (namespace [s]
+    (assert-result r (instance? (maybe-of Symbol) r))
+
+    nothing)
+
+  (tag [s]
+    (tag s "" 0))
+
+  (tag [s file line])
+
+  (untag [x]
+    (assert-result r (instance? Symbol r))))
+
 (deftype tagged-symbol [ns base sym file line]
   (assert (instance? SymbolOrString file))
   (assert (instance? (maybe-of Symbol) ns))
@@ -57,27 +72,8 @@
   (<* [_ x] (<* x base))
 
   Eq
-  (=* [_ x] (=* x base)))
+  (=* [_ x] (=* x base))
 
-;; we tag symbols with file/line for use later
-(defprotocol Tagged
-  (namespace [s]
-    (assert-result r (instance? (maybe-of Symbol) r))
-
-    nothing)
-
-  (tag [s]
-    (assert-result r (instance? tagged-symbol r))
-
-    (tag s "" 0))
-
-  (tag [s file line]
-   (assert-result r (instance? tagged-symbol r)))
-
-  (untag [x]
-    (assert-result r (instance? Symbol r))))
-
-(extend-type tagged-symbol
   Stringable
   (string-list [s]
     (list (either (map (.ns s) (fn [ns-str] (str ns-str "/" (untag (.base s)))))
@@ -111,18 +107,19 @@
 (extend-type Sequence
   FileLineInfo
   (file-name [v]
-    (either (map (some v (fn [x]
-                           (let [file (file-name x)]
-                             (or (= file 'core)
-                                 (first file)))))
-                 file-name)
+    (either (some v (fn [x]
+                      (let [file (file-name x)]
+                        (and (or (= file 'core)
+                                 (first file))
+                             (maybe file)))))
             ""))
+
   (line-number [v]
-    (either (map (some v (fn [x]
-                           (let [file (file-name x)]
-                             (or (= file 'core)
-                                 (first file)))))
-                 line-number)
+    (either (some v (fn [x]
+                      (let [file (file-name x)]
+                        (and (or (= file 'core)
+                                 (first file))
+                             (maybe (line-number x))))))
             0)))
 
 (extend-type HashMap
@@ -210,6 +207,13 @@
                   empty-list)
           (list "]")))
 
+  Tagged
+  (tag [_ file line]
+    (params-ast (map fixed (fn [x]
+                             (tag x file line)))
+                (map variadic (fn [x]
+                                (tag x file line)))))
+
   Collection
   (count [_] (count fixed))
 
@@ -287,7 +291,7 @@
 
   Stringable
   (string-list [_]
-    (comp (list "(fn" (str (either fn-sym "")) " ")
+    (comp (list "(fn " (str (either fn-sym "")) " ")
           (cond (= 1 (count arities))
                 (flat-map (seq arities) string-list)
                 (flat-map (seq arities) (fn [arity]
@@ -314,8 +318,8 @@
           (list ")")))
 
   FileLineInfo
-  (file-name [_] (file-name call-target))
-  (line-number [_] (line-number call-target)))
+  (file-name [_] (file-name args))
+  (line-number [_] (line-number args)))
 
 (defn call-expr [[target & args]]
   (call-ast target (vec args)))
@@ -331,8 +335,8 @@
     (list (str binding) " " (str val)))
 
   FileLineInfo
-  (file-name [_] (file-name binding))
-  (line-number [_] (line-number binding)))
+  (file-name [_] (file-name val))
+  (line-number [_] (line-number val)))
 
 (defn binding [binding val]
   (binding-ast binding val))
