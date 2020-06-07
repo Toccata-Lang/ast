@@ -613,7 +613,7 @@
 
 
 (deftype reify-ast [type-num impls]
-  (assert (instance? Integer type-num))
+  (assert (instance? (maybe-of Integer) type-num))
   (assert (instance? HashMap impls))
 
   Stringable
