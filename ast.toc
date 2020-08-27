@@ -42,9 +42,7 @@
 ;; we tag symbols with file/line for use later
 (defprotocol Tagged
   (namespace [s]
-    (assert-result r (instance? (maybe-of Symbol) r))
-
-    nothing)
+    (assert-result r (instance? (maybe-of Symbol) r)))
 
   (tag [s]
     (tag s "" 0))
@@ -66,7 +64,7 @@
   (line-number [s] line)
 
   Hashable
-  (sha1 [_] (sha1 base))
+  (sha1 [x] (sha1 base))
 
   Ord
   (<* [_ x] (<* x base))
@@ -97,7 +95,8 @@
 
 (extend-type Symbol
   Tagged
-  (namespace [s] nothing)
+  (namespace [s]
+    nothing)
   (tag [s]
     (tagged-symbol nothing s s "" 0))
   (tag [s file line]
@@ -174,14 +173,14 @@
 
 (deftype inline-ast [lang result-type txt path-to-file line-num]
   (assert (instance? tagged-symbol lang))
-  (assert (instance? (maybe-of tagged-symbol) result-type))
+  (assert (instance? c/ValueConstraint result-type))
   (assert (instance? String txt))
   (assert (instance? SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
 
   Stringable
   (string-list [_]
-    (list "(inline " (str lang) " " (str (either result-type "")) " \"" txt "\")"))
+    (list "(inline " (str lang) " " (str result-type) " \"" txt "\")"))
 
   FileLineInfo
   (file-name [_] path-to-file)
