@@ -1,7 +1,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "ff0ac6e"))
+                          :sha "3da68b2"))
 
 (def SymbolOrString (any-of Symbol
                             String))
@@ -262,6 +262,7 @@
 
 
 (deftype fn-arity-ast [fn-sym fn-var params doc body param-consts result-const]
+  (assert (instance? tagged-symbol fn-sym))
   (assert (instance? params-ast params))
   (assert (instance? Vector body))
   (assert (instance? c/ItemsConstraint param-consts))
@@ -277,11 +278,11 @@
   (line-number [_] (line-number body)))
 
 (defn fn-arity [params doc body]
-  (fn-arity-ast "" "" params doc body c/empty-items-constraint c/top-type))
+  (fn-arity-ast (tag "") "" params doc body c/empty-items-constraint c/top-type))
 
 
 (deftype fn-ast [fn-sym arities]
-  (assert (instance? Maybe fn-sym))
+  (assert (instance? (maybe-of tagged-symbol) fn-sym))
   (assert (instance? Vector arities))
 
   Type
@@ -290,9 +291,12 @@
 
   Stringable
   (string-list [_]
-    (comp (list "(fn " (str (either fn-sym "")) " ")
+    (comp (list "(fn " (str (either (map fn-sym
+                                         (fn [s] (str s " ")))
+                                    "")))
           (cond (= 1 (count arities))
                 (flat-map (seq arities) string-list)
+
                 (flat-map (seq arities) (fn [arity]
                                           (comp (list "(")
                                                 (string-list arity)
