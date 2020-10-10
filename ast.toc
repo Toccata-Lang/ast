@@ -1,7 +1,9 @@
 
+;; TODO: make constraints a recursive type when possible
+
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "4bede89"))
+                          :sha "75b9949"))
 
 (def SymbolOrString (any-of Symbol
                             String))
