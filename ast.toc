@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "75b9949"))
+                          :sha "8ebd787"))
 
 (def SymbolOrString (any-of Symbol
                             String))
@@ -531,15 +531,6 @@
   (line-number [c]
     (either (line-number-from-path (.path c))
             (line-number (.alts c)))))
-
-(extend-type c/KeysConstraint
-  FileLineInfo
-  (file-name [c]
-    (either (file-name-from-path (.path c))
-            (file-name (.constraint c))))
-  (line-number [c]
-    (either (line-number-from-path (.path c))
-            (line-number (.constraint c)))))
 
 (extend-type c/ResultConstraint
   FileLineInfo
