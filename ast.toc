@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "fda0215"))
+                          :sha "a39c1f1"))
 
 (def SymbolOrString (any-of Symbol
                             String))
@@ -17,7 +17,14 @@
     (list (either (and (= file 'core)
                        (maybe "$TOCCATA_DIR/core.toc"))
                   (str file))
-          ", " (str line))))
+          ", " (str line)))
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x)))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -64,6 +71,13 @@
   FileLineInfo
   (file-name [s] file)
   (line-number [s] line)
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
 
   Hashable
   (sha1 [x] (sha1 base))
@@ -140,6 +154,13 @@
                          (interpose lines "\n")
                          (list ">")))
 
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
+
   FileLineInfo
   (file-name [_] path-to-file)
   (line-number [_] line-num))
@@ -156,6 +177,13 @@
   Stringable
   (string-list [_] (list (str int)))
 
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
+
   FileLineInfo
   (file-name [_] path-to-file)
   (line-number [_] line-num))
@@ -168,6 +196,13 @@
 
   Stringable
   (string-list [_] (list "\"" string "\""))
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
 
   FileLineInfo
   (file-name [_] path-to-file)
@@ -184,6 +219,13 @@
   (string-list [_]
     (list "(inline " (str lang) " " (str result-type) " \"" txt "\")"))
 
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
+
   FileLineInfo
   (file-name [_] path-to-file)
   (line-number [_] line-num))
@@ -193,12 +235,6 @@
 
 
 (deftype params-ast [fixed variadic]
-  (assert (instance? (vector-of (any-of tagged-symbol
-                                        params-ast))
-                     fixed))
-  (assert (instance? (maybe-of tagged-symbol)
-                     variadic))
-
   Stringable
   (string-list [_]
     (comp (list "[")
@@ -207,6 +243,20 @@
                                   (cons " & " (string-list variadic))))
                   empty-list)
           (list "]")))
+
+  Container
+  (map [x f]
+    (params-ast (map fixed f) (map variadic f)))
+
+  (map [x f embed]
+    (either (map variadic (fn [var]
+                            (for [new-fixed (map fixed f embed)
+                                  new-var (f var)]
+                              (params-ast new-fixed (maybe new-var)))))
+
+          (map (map fixed f embed)
+               (fn [new-fixed]
+                 (params-ast new-fixed nothing)))))
 
   Tagged
   (tag [_ file line]
@@ -241,6 +291,15 @@
                          (string-list body)
                          (list ">")))
 
+  Container
+  (map [x f]
+    (main-ast (f params) (map body f)))
+
+  (map [x f embed]
+    (for [new-params (f params)
+          new-body (map body f embed)]
+      (main-ast new-params new-body)))
+
   FileLineInfo
   (file-name [_] (file-name body))
   (line-number [_] (line-number body)))
@@ -254,6 +313,13 @@
 
   Stringable
   (string-list [_] (list "<DeclareAST " (str sym) ">"))
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
 
   FileLineInfo
   (file-name [_] (file-name sym))
@@ -275,13 +341,21 @@
                          (list "\n")
                          (flat-map (interpose body "\n") string-list)))
 
+  Container
+  (map [x f]
+    (.body x (map body f)))
+
+  (map [x f embed]
+    (-> body
+        (map f embed)
+        (map (partial .body x))))
+
   FileLineInfo
   (file-name [_] (file-name body))
   (line-number [_] (line-number body)))
 
 (defn fn-arity [params doc body]
   (fn-arity-ast (tag "") "" params doc body c/empty-items-constraint c/top-type))
-
 
 (deftype fn-ast [fn-sym arities]
   (assert (instance? (maybe-of tagged-symbol) fn-sym))
@@ -305,6 +379,20 @@
                                                 (list ")")))))
           (list  ")")))
 
+  Container
+  (map [x f]
+    (fn-ast fn-sym (map arities f)))
+
+  (map [x f embed]
+    (-> arities
+        (map f embed)
+        (map (fn [new-arities]
+               (or (instance? Vector new-arities)
+                   (do
+                     (maybe (print-err 'boom arities "\n\n" new-arities))))
+               (fn-ast fn-sym (either (maybe new-arities)
+                                      []))))))
+
  FileLineInfo
   (file-name [_] (file-name arities))
   (line-number [_] (line-number arities)))
@@ -321,6 +409,15 @@
     (comp (list "(" (str call-target) " ")
           (flat-map (interpose (seq args) " ") string-list)
           (list ")")))
+
+  Container
+  (map [x f]
+    (call-ast (f call-target) (map args f)))
+
+  (map [x f embed]
+    (for [new-target (f call-target)
+          new-args (map args f embed)]
+      (call-ast new-target new-args)))
 
   FileLineInfo
   (file-name [_] (file-name args))
@@ -339,6 +436,15 @@
   (string-list [_]
     (list (str binding) " " (str val)))
 
+  Container
+  (map [x f]
+    (binding-ast (f binding) (f val)))
+
+  (map [x f embed]
+    (for [new-val (f val)
+          new-binding (f binding)]
+      (binding-ast new-binding new-val)))
+
   FileLineInfo
   (file-name [_] (file-name val))
   (line-number [_] (line-number val)))
@@ -353,6 +459,15 @@
   Stringable
   (string-list [_]
     (list "(let [" (to-str (interpose bindings "\n")) "]\n" (apply str (interpose body "\n")) ")"))
+
+  Container
+  (map [x f]
+    (let-ast (map bindings f) (map body f)))
+
+  (map [x f embed]
+    (map (map bindings f embed)
+         (fn [new-bindings]
+           (let-ast new-bindings body))))
 
   FileLineInfo
   (file-name [_] (file-name body))
@@ -373,6 +488,14 @@
           (flat-map (interpose clauses "\n") string-list)
           (list ")")))
 
+  Container
+  (map [x f]
+    (and-ast (map clauses f)))
+
+  (map [x f embed]
+    (map (map clauses f embed)
+         and-ast))
+
   FileLineInfo
   (file-name [_] (extract (map (first clauses) file-name)))
   (line-number [_] (extract (map (first clauses) line-number))))
@@ -389,6 +512,14 @@
     (comp (list "(or ")
           (flat-map (seq clauses) string-list)
           (list ")")))
+
+  Container
+  (map [x f]
+    (or-ast (map clauses f)))
+
+  (map [x f embed]
+    (map (map clauses f embed)
+         or-ast))
 
   FileLineInfo
   (file-name [_] (extract (map (first clauses) file-name)))
@@ -407,6 +538,15 @@
           (list "\n")
           (string-list alt)
           (list ")")))
+
+  Container
+  (map [x f]
+    (either-ast (f clause) (f alt)))
+
+  (map [x f embed]
+    (for [new-clause (f clause)
+          new-alt (f alt)]
+      (either-ast new-clause new-alt)))
 
   FileLineInfo
   (file-name [_] (file-name clause))
@@ -551,6 +691,14 @@
   Stringable
   (string-list [_] (list "<PrototypeFnAST " (str fn-name) ">"))
 
+  Container
+  (map [x f]
+    (.default-body x (map default-body f)))
+
+  (map [x f embed]
+    (map (map default-body f embed)
+         (partial .default-body x)))
+
   FileLineInfo
   (file-name [_] (file-name fn-name))
   (line-number [_] (line-number fn-name)))
@@ -566,6 +714,14 @@
   Stringable
   (string-list [_] (list "<ProtocolAST " (str protocol-sym) ">"))
 
+  Container
+  (map [x f]
+    (.prototypes x (map prototypes f)))
+
+  (map [x f embed]
+    (map (map prototypes f embed)
+         (partial .prototypes x)))
+
   FileLineInfo
   (file-name [_] (file-name protocol-sym))
   (line-number [_] (line-number protocol-sym)))
@@ -580,6 +736,14 @@
 
   Stringable
   (string-list [_] (list "<ExtendAST " (str type) ">"))
+
+  Container
+  (map [x f]
+    (.impls x (map impls f)))
+
+  (map [x f embed]
+    (map (map impls f embed)
+         (partial .impls x)))
 
   FileLineInfo
   (file-name [_] (file-name type))
@@ -601,6 +765,14 @@
     (and (< q-val (.q-val x))
          (maybe x)))
 
+  Container
+  (map [x f]
+    (quoted-ast (f q-val)))
+
+  (map [x f embed]
+    (map (f q-val)
+         quoted-ast))
+
   FileLineInfo
   (file-name [_] (file-name q-val))
   (line-number [_] (line-number q-val)))
@@ -609,12 +781,35 @@
   (quoted-ast q-val))
 
 
+(defn contextual-map-vals [m f embed]
+  (-> m
+      vec
+      (map (fn [[k v]]
+             (map (map v f embed)
+                  (partial vector k)))
+           embed)))
+
 (deftype reify-ast [type-num impls]
   (assert (instance? (maybe-of Integer) type-num))
   (assert (instance? HashMap impls))
 
   Stringable
   (string-list [_] (list "(reify " (str type-num " \n" impls) ")"))
+
+  Container
+  (map [x f]
+    (.impls x (map-vals impls (fn [impl-fns]
+                                (map-vals impl-fns (fn [arities]
+                                                     (map arities f)))))))
+
+  (map [x f embed]
+    (map (contextual-map-vals impls (fn [impl-fns]
+                                      (contextual-map-vals impl-fns
+                                                           (fn [arities]
+                                                             (map arities f))
+                                                           embed))
+                              embed)
+         (partial .impls x)))
 
   FileLineInfo
   (file-name [_] (file-name impls))
@@ -627,6 +822,15 @@
   Stringable
   (string-list [_]
     (list (str conditional " " value)))
+
+  Container
+  (map [x f]
+    (cond-val-ast (f conditional) (f value)))
+
+  (map [x f embed]
+    (for [new-cond (f conditional)
+          new-value (f value)]
+      (cond-val-ast new-cond new-value)))
 
   FileLineInfo
   (file-name [ast]
@@ -649,6 +853,15 @@
                                                     [(str c-v) "\n"])))
           (str default) ")\n"))
 
+  Container
+  (map [x f]
+    (cond-ast (map conditionals f) (f default)))
+
+  (map [x f embed]
+    (for [new-conds (map conditionals f embed)
+          new-default (f default)]
+      (cond-ast new-conds new-default)))
+
   FileLineInfo
   (file-name [ast]
     (file-name conditionals))
@@ -667,6 +880,14 @@
   Stringable
   (string-list [_] (list "<TypeAST " (str sym) ">"))
 
+  Container
+  (map [x f]
+    (.impls x (map impls f)))
+
+  (map [x f]
+    (map (map impls f)
+         (partial .impls x)))
+
   FileLineInfo
   (file-name [_] (file-name sym))
   (line-number [_] (line-number sym)))
@@ -675,7 +896,14 @@
   (type-ast sym fields impls))
 
 (deftype module-ast [file-path]
-  (assert (instance? String file-path)))
+  (assert (instance? String file-path))
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x)))
 
 (defn module [file-path]
   (module-ast file-path))
@@ -685,6 +913,13 @@
   (assert (instance? String repo))
   (assert (instance? String file))
   (assert (instance? HashMap args))
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
 
   FileLineInfo
   (file-name [_] (file-name repo))
@@ -699,6 +934,14 @@
 
   Stringable
   (string-list [_] (list "<AddNS " (str ns-sym) ">"))
+
+  Container
+  (map [x f]
+    (add-ns-ast ns-sym (f mod)))
+
+  (map [x f embed]
+    (map (f mod)
+         (partial add-ns-ast ns-sym)))
 
   FileLineInfo
   (file-name [_] (file-name ns-sym))
@@ -716,6 +959,14 @@
           (interpose (map value-exprs str) "\n")
           (list ")")))
 
+  Container
+  (map [x f]
+    (definition-ast sym (map value-exprs f)))
+
+  (map [x f embed]
+    (map (map value-exprs f embed)
+         (partial definition-ast sym)))
+
   FileLineInfo
   (file-name [_] (file-name sym))
   (line-number [_] (line-number sym)))
@@ -727,6 +978,13 @@
   Stringable
   (string-list [_]
     (list "(JS-callable " (str sym) ", " (str num-args) ")"))
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
 
   FileLineInfo
   (file-name [_] (file-name sym))
