@@ -48,6 +48,32 @@
   (line-number [ast]
     (.line ast)))
 
+(deftype Annotated [ast annots]
+  Stringable
+  (string-list [_]
+    (list "^" (str ast)))
+
+  Container
+  (map [a f]
+    (.ast a (f ast)))
+
+  (map [a f embed]
+    (flat-map (f ast) (partial .ast a)))
+
+  FileLineInfo
+  (file-name [_]
+    (file-name ast))
+
+  (line-number [_]
+    (line-number ast))
+
+  FileLoc
+  (location [_]
+    (Location (file-name ast) (line-number ast))))
+
+(defn annotated [ast]
+  (Annotated ast 'annotations))
+
 ;; we tag symbols with file/line for use later
 (defprotocol Tagged
   (namespace [s]
