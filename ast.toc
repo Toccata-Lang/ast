@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "a39c1f1"))
+                          :sha "a60266a"))
 
 (def SymbolOrString (any-of Symbol
                             String))
@@ -331,8 +331,6 @@
 
 (deftype fn-arity-ast [fn-sym fn-var params doc body param-consts result-const]
   (assert (instance? tagged-symbol fn-sym))
-  (assert (instance? params-ast params))
-  (assert (instance? Vector body))
   (assert (instance? c/ItemsConstraint param-consts))
   (assert (instance? c/ValueConstraint result-const))
 
@@ -346,9 +344,12 @@
     (.body x (map body f)))
 
   (map [x f embed]
-    (-> body
-        (map f embed)
-        (map (partial .body x))))
+    (for [new-params (f params)
+          new-body (-> body
+                       (map f embed))]
+      (-> x
+          (.params new-params)
+          (.body new-body))))
 
   FileLineInfo
   (file-name [_] (file-name body))
@@ -430,8 +431,6 @@
                            params-ast))
 
 (deftype binding-ast [binding val]
-  (assert (instance? BindingTarget binding))
-
   Stringable
   (string-list [_]
     (list (str binding) " " (str val)))
