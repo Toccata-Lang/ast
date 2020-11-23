@@ -1015,6 +1015,14 @@
   (file-name [_] (file-name sym))
   (line-number [_] (line-number sym)))
 
+(defprotocol IsCode
+  (generates-code? [x]))
+
+(extend-type Annotated
+  IsCode
+  (generates-code? [a]
+    (generates-code? (.ast a))))
+
 (def CodeAST (any-of inline-ast
                      let-ast
                      and-ast
@@ -1026,10 +1034,22 @@
                      fn-ast
                      string-ast
                      integer-ast
+                     tagged-symbol
+                     cond-ast
                      Symbol
                      String
                      Integer))
 
+(extend-type CodeAST
+  IsCode
+  (generates-code? [ast]
+    (maybe ast)))
+
 (def NoCode (any-of c/ResultConstraint
                     block-comment-ast
                     c/ValueConstraint))
+
+(extend-type NoCode
+  IsCode
+  (generates-code? [_]
+    nothing))
