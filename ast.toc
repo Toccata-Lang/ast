@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "a60266a"))
+                          :sha "ba4f27d"))
 
 (def SymbolOrString (any-of Symbol
                             String))
