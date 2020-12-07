@@ -58,7 +58,7 @@
     (.ast a (f ast)))
 
   (map [a f embed]
-    (flat-map (f ast) (partial .ast a)))
+    (map (f ast) (partial .ast a)))
 
   FileLineInfo
   (file-name [_]
@@ -989,7 +989,7 @@
     (definition-ast sym (map value-exprs f)))
 
   (map [x f embed]
-    (map (map value-exprs f embed)
+    (map (map (vec value-exprs) f embed)
          (partial definition-ast sym)))
 
   FileLineInfo
