@@ -912,7 +912,7 @@
         (.fields (map fields f))
         (.impls (map impls f))))
 
-  (map [x f]
+  (map [x f embed]
     (for [new-fields (map fields f embed)
           new-impls (map impls f embed)]
       (-> x
