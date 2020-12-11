@@ -280,9 +280,9 @@
                                   new-var (f var)]
                               (params-ast new-fixed (maybe new-var)))))
 
-          (map (map fixed f embed)
-               (fn [new-fixed]
-                 (params-ast new-fixed nothing)))))
+            (map (map fixed f embed)
+                 (fn [new-fixed]
+                   (params-ast new-fixed nothing)))))
 
   Tagged
   (tag [_ file line]
@@ -367,7 +367,9 @@
 
   Container
   (map [x f]
-    (.body x (map body f)))
+    (-> x
+        (.params (map params f))
+        (.body (map body f))))
 
   (map [x f embed]
     (for [new-params (f params)
@@ -414,11 +416,7 @@
     (-> arities
         (map f embed)
         (map (fn [new-arities]
-               (or (instance? Vector new-arities)
-                   (do
-                     (maybe (print-err 'boom arities "\n\n" new-arities))))
-               (fn-ast fn-sym (either (maybe new-arities)
-                                      []))))))
+               (fn-ast fn-sym new-arities)))))
 
  FileLineInfo
   (file-name [_] (file-name arities))
@@ -722,11 +720,16 @@
 
   Container
   (map [x f]
-    (.default-body x (map default-body f)))
+    (-> x
+        (.params (map params f))
+        (.default-body (map default-body f))))
 
   (map [x f embed]
-    (map (map default-body f embed)
-         (partial .default-body x)))
+    (for [new-params (map params f embed)
+          new-body (map default-body f embed)]
+      (-> x
+          (.params new-params)
+          (.default-body new-body))))
 
   FileLineInfo
   (file-name [_] (file-name fn-name))
@@ -905,11 +908,16 @@
 
   Container
   (map [x f]
-    (.impls x (map impls f)))
+    (-> x
+        (.fields (map fields f))
+        (.impls (map impls f))))
 
   (map [x f]
-    (map (map impls f)
-         (partial .impls x)))
+    (for [new-fields (map fields f embed)
+          new-impls (map impls f embed)]
+      (-> x
+          (.fields new-fields)
+          (.impls new-impls))))
 
   FileLineInfo
   (file-name [_] (file-name sym))
