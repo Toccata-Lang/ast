@@ -490,9 +490,9 @@
     (let-ast (map bindings f) (map body f)))
 
   (map [x f embed]
-    (map (map bindings f embed)
-         (fn [new-bindings]
-           (let-ast new-bindings body))))
+    (for [new-bindings (map bindings f embed)
+          new-body (map body f embed)]
+      (let-ast new-bindings new-body)))
 
   FileLineInfo
   (file-name [_] (file-name body))
@@ -708,13 +708,17 @@
   (c/ResultConstraint assertion))
 
 
-(deftype prototype-ast [fn-name params doc default-body]
+(deftype prototype-ast [fn-name params doc default-body param-consts result-const]
   (assert (instance? params-ast params))
   (assert (instance? block-comment-ast doc))
   (assert (instance? Vector default-body))
 
   Stringable
-  (string-list [_] (list "<PrototypeFnAST " (str fn-name) ">"))
+  (string-list [_] (comp (list "(" (str fn-name) " ")
+                         (string-list params)
+                         (list "\n")
+                         (flat-map (interpose default-body "\n") string-list)
+                         ")"))
 
   Container
   (map [x f]
@@ -729,7 +733,7 @@
   (line-number [_] (line-number fn-name)))
 
 (defn prototype [fn-name args doc default-body]
-  (prototype-ast fn-name args doc default-body))
+  (prototype-ast fn-name args doc default-body c/empty-items-constraint c/top-type))
 
 
 (deftype protocol-ast [protocol-sym prototypes]
@@ -737,7 +741,9 @@
   (assert (instance? Vector prototypes))
 
   Stringable
-  (string-list [_] (list "<ProtocolAST " (str protocol-sym) ">"))
+  (string-list [_] (list "(defprotocol " (str protocol-sym) "\n"
+                         (to-str (interpose prototypes "\n"))
+                         ")"))
 
   Container
   (map [x f]
@@ -805,14 +811,6 @@
 (defn quoted [q-val]
   (quoted-ast q-val))
 
-
-(defn contextual-map-vals [m f embed]
-  (-> m
-      vec
-      (map (fn [[k v]]
-             (map (map v f embed)
-                  (partial vector k)))
-           embed)))
 
 (deftype reify-ast [type-num impls]
   (assert (instance? (maybe-of Integer) type-num))
