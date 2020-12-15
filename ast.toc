@@ -918,11 +918,24 @@
   (map [x f]
     (-> x
         (.fields (map fields f))
-        (.impls (map impls f))))
+        (.impls (map impls
+                     (fn [proto-map]
+                       (map-vals proto-map
+                                 (fn [impls-map]
+                                   (map-vals impls-map f))))))))
 
   (map [x f embed]
     (for [new-fields (map fields f embed)
-          new-impls (map impls f embed)]
+          new-impls (map impls
+                         (fn [proto-map]
+                           (contextual-map-vals proto-map
+                                                (fn [impls-map]
+                                                  (contextual-map-vals impls-map
+                                                                       (fn [arity-vec]
+                                                                         (map arity-vec f embed))
+                                                                       embed))
+                                                embed))
+                         embed)]
       (-> x
           (.fields new-fields)
           (.impls new-impls))))
