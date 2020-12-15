@@ -401,11 +401,12 @@
                                     "")))
           (cond (= 1 (count arities))
                 (flat-map (seq arities) string-list)
-
-                (flat-map (seq arities) (fn [arity]
-                                          (comp (list "(")
-                                                (string-list arity)
-                                                (list ")")))))
+                (-> (seq arities)
+                    (interpose "\n")
+                    (flat-map (fn [arity]
+                                (comp (list "(")
+                                      (string-list arity)
+                                      (list ")"))))))
           (list  ")")))
 
   Container
@@ -769,14 +770,23 @@
   (assert (instance? HashMap impls))
 
   Stringable
-  (string-list [_] (list "<ExtendAST " (str type) ">"))
+  (string-list [_] (list "(extend-type " (str type)
+                         "\n" (to-str (interpose impls "\n"))
+                         ")"))
 
   Container
   (map [x f]
-    (.impls x (map impls f)))
+    (.impls x (map-vals impls (fn [impl-fns]
+                                (map-vals impl-fns (fn [arities]
+                                                     (map arities f)))))))
 
   (map [x f embed]
-    (map (map impls f embed)
+    (map (contextual-map-vals impls (fn [impl-fns]
+                                      (contextual-map-vals impl-fns
+                                                           (fn [arities]
+                                                             (map arities f embed))
+                                                           embed))
+                              embed)
          (partial .impls x)))
 
   FileLineInfo
@@ -832,7 +842,7 @@
     (map (contextual-map-vals impls (fn [impl-fns]
                                       (contextual-map-vals impl-fns
                                                            (fn [arities]
-                                                             (map arities f))
+                                                             (map arities f embed))
                                                            embed))
                               embed)
          (partial .impls x)))
@@ -869,9 +879,7 @@
   (cond-val-ast conditional value))
 
 (deftype cond-ast [conditionals default]
-  (assert (instance? (all-of (vector-of cond-val-ast)
-                             (min-count 1))
-                     conditionals))
+  (assert (instance? (min-count 1) conditionals))
 
   Stringable
   (string-list [_]
