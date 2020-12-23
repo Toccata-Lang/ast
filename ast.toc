@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "dd8f917"))
+                          :sha "db280f6"))
 
 (def SymbolOrString (any-of Symbol
                             String))
@@ -383,8 +383,23 @@
   (file-name [_] (file-name body))
   (line-number [_] (line-number body)))
 
-(defn fn-arity [params doc body]
-  (fn-arity-ast (tag "") "" params doc body c/empty-items-constraint c/top-type))
+(defn new-param-constraints [params]
+  (assert (instance? params-ast params))
+
+  (-> c/empty-items-constraint
+      (.items-constraints (vec (repeat (count (.fixed params)) c/top-type)))
+      (.tail-constraint (cond (.variadic params)
+                              (c/CollectionOf c/top-type empty-list nothing "")
+                              c/bottom-type))
+      (c/update-path (file-name params) (line-number params))))
+
+(defn fn-arity
+  ([params doc body]
+   (fn-arity (tag "") params doc body))
+  ([fn-sym params doc body]
+   (fn-arity-ast fn-sym "" params doc body
+                 (new-param-constraints params) 
+                 c/top-type)))
 
 (deftype fn-ast [fn-sym arities]
   (assert (instance? (maybe-of tagged-symbol) fn-sym))
@@ -419,7 +434,7 @@
         (map (fn [new-arities]
                (fn-ast fn-sym new-arities)))))
 
- FileLineInfo
+  FileLineInfo
   (file-name [_] (file-name arities))
   (line-number [_] (line-number arities)))
 
@@ -737,7 +752,9 @@
   (line-number [_] (line-number fn-name)))
 
 (defn prototype [fn-name args doc default-body]
-  (prototype-ast fn-name args doc default-body c/empty-items-constraint c/top-type))
+  (prototype-ast fn-name args doc default-body
+                 (new-param-constraints args)
+                 c/top-type))
 
 
 (deftype protocol-ast [protocol-sym prototypes]
