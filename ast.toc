@@ -723,6 +723,7 @@
 
 
 (deftype prototype-ast [fn-name params doc default-body param-consts result-const]
+  (assert (instance? tagged-symbol fn-name))
   (assert (instance? params-ast params))
   (assert (instance? block-comment-ast doc))
   (assert (instance? Vector default-body))
