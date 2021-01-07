@@ -3,32 +3,11 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b5649ed"))
-
-(def SymbolOrString (any-of Symbol
-                            String))
-
-(deftype Location [file line]
-  (assert (instance? SymbolOrString file))
-  (assert (instance? Integer line))
-
-  Stringable
-  (string-list [_]
-    (list (either (and (= file 'core)
-                       (maybe "$TOCCATA_DIR/core.toc"))
-                  (str file))
-          ", " (str line)))
-
-  Container
-  (map [x f]
-    x)
-
-  (map [x f embed]
-    (embed x)))
+                          :sha "d94ab77"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
-    (assert-result x (instance? SymbolOrString x))
+    (assert-result x (instance? c/SymbolOrString x))
     "")
 
   (line-number [ast]
@@ -37,12 +16,12 @@
 ;; TODO: combine with FileLineInfo
 (defprotocol FileLoc
   (location [ast]
-    (Location (file-name ast) (line-number ast))))
+    (c/Location (file-name ast) (line-number ast))))
 
-(extend-type Location
+(extend-type c/Location
   FileLineInfo
   (file-name [ast]
-    (assert-result x (instance? SymbolOrString x))
+    (assert-result x (instance? c/SymbolOrString x))
     (.file ast))
 
   (line-number [ast]
@@ -69,7 +48,7 @@
 
   FileLoc
   (location [_]
-    (Location (file-name ast) (line-number ast))))
+    (c/Location (file-name ast) (line-number ast))))
 
 (defn annotated [ast]
   (Annotated ast 'annotations))
@@ -82,13 +61,17 @@
   (tag [s]
     (tag s "" 0))
 
+  (tag [s loc]
+    (assert (instance? c/Location loc))
+    (tag s (.file loc) (.line loc)))
+
   (tag [s file line])
 
   (untag [x]
     (assert-result r (instance? Symbol r))))
 
 (deftype tagged-symbol [ns base sym file line]
-  (assert (instance? SymbolOrString file))
+  (assert (instance? c/SymbolOrString file))
   (assert (instance? (maybe-of Symbol) ns))
   (assert (instance? Symbol sym))
   (assert (instance? Symbol base))
@@ -172,7 +155,7 @@
 
 (deftype block-comment-ast [lines path-to-file line-num]
   (assert (instance? (vector-of String) lines))
-  (assert (instance? SymbolOrString path-to-file))
+  (assert (instance? c/SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
 
   Stringable
@@ -197,7 +180,7 @@
 
 (deftype integer-ast [int path-to-file line-num]
   (assert (instance? Integer int))
-  (assert (instance? SymbolOrString path-to-file))
+  (assert (instance? c/SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
 
   Stringable
@@ -217,7 +200,7 @@
 
 (deftype string-ast [string path-to-file line-num]
   (assert (instance? String string))
-  (assert (instance? SymbolOrString path-to-file))
+  (assert (instance? c/SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
 
   Stringable
@@ -238,7 +221,7 @@
   (assert (instance? tagged-symbol lang))
   (assert (instance? c/ValueConstraint result-type))
   (assert (instance? String txt))
-  (assert (instance? SymbolOrString path-to-file))
+  (assert (instance? c/SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
 
   Stringable
@@ -461,8 +444,14 @@
       (call-ast new-target new-args)))
 
   FileLineInfo
-  (file-name [_] (file-name args))
-  (line-number [_] (line-number args)))
+  (file-name [_]
+    (cond (first args)
+          (file-name args)
+          (file-name call-target)))
+  (line-number [_]
+    (cond (first args)
+          (line-number args)
+          (line-number call-target))))
 
 (defn call-expr [[target & args]]
   (call-ast target (vec args)))
