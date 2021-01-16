@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "2868067"))
+                          :sha "4fc4f4f"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -290,7 +290,6 @@
 
 
 (deftype main-ast [params body]
-  (assert (instance? params-ast params))
   (assert (instance? Vector body))
 
   Stringable
