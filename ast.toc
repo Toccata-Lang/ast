@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "7f5f8de"))
+                          :sha "de79052"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -636,43 +636,7 @@
             (file-name (.items-constraints c))))
   (line-number [c] 0))
 
-(extend-type c/StaticIntConstraint
-  FileLineInfo
-  (file-name [c]
-    (either (file-name-from-path (.path c))
-            ""))
-  (line-number [c]
-    (either (line-number-from-path (.path c))
-            0)))
-
-(extend-type c/MinValue
-  FileLineInfo
-  (file-name [c]
-    (either (file-name-from-path (.path c))
-            ""))
-  (line-number [c]
-    (either (line-number-from-path (.path c))
-            0)))
-
-(extend-type c/MaxValue
-  FileLineInfo
-  (file-name [c]
-    (either (file-name-from-path (.path c))
-            ""))
-  (line-number [c]
-    (either (line-number-from-path (.path c))
-            0)))
-
 (extend-type c/StaticLengthConstraint
-  FileLineInfo
-  (file-name [c]
-    (either (file-name-from-path (.path c))
-            ""))
-  (line-number [c]
-    (either (line-number-from-path (.path c))
-            0)))
-
-(extend-type c/StaticStrConstraint
   FileLineInfo
   (file-name [c]
     (either (file-name-from-path (.path c))
