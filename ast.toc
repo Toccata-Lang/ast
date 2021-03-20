@@ -620,21 +620,27 @@
   (file-name [c]
     (either (file-name-from-path (.path c))
             (file-name (.contents c))))
-  (line-number [c] 0))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            (line-number (.contents c)))))
 
 (extend-type c/CollectionOf
   FileLineInfo
   (file-name [c]
     (either (file-name-from-path (.path c))
             (file-name (.contents c))))
-  (line-number [c] 0))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            (line-number (.contents c)))))
 
 (extend-type c/ItemsConstraint
   FileLineInfo
   (file-name [c]
     (either (file-name-from-path (.path c))
             (file-name (.items-constraints c))))
-  (line-number [c] 0))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            (line-number (.items-constraints c)))))
 
 (extend-type c/StaticLengthConstraint
   FileLineInfo
