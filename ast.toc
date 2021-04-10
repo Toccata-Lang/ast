@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "c8076d1"))
+                          :sha "d8aa87c"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -523,6 +523,9 @@
     (map (map clauses f embed)
          and-ast))
 
+  FileLoc
+  (location [_] (extract (map (first clauses) location)))
+
   FileLineInfo
   (file-name [_] (extract (map (first clauses) file-name)))
   (line-number [_] (extract (map (first clauses) line-number))))
@@ -547,6 +550,9 @@
   (map [x f embed]
     (map (map clauses f embed)
          or-ast))
+
+  FileLoc
+  (location [_] (extract (map (first clauses) location)))
 
   FileLineInfo
   (file-name [_] (extract (map (first clauses) file-name)))
