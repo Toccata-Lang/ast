@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "a8b3543"))
+                          :sha "601dd1f"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -101,7 +101,7 @@
   (string-list [s]
     (list (either (map (.ns s) (fn [ns-str] (str ns-str "/" (untag (.base s)))))
                   (str (untag (.base s))))))
-  
+
   Tagged
   (namespace [s] (.ns s))
   (tag [s] s)
@@ -339,7 +339,7 @@
 
 (deftype fn-arity-ast [fn-sym fn-var params doc body param-consts result-const]
   (assert (instance? tagged-symbol fn-sym))
-  (assert (instance? c/ItemsConstraint param-consts))
+  (assert (instance? c/ListConstraint param-consts))
   (assert (instance? c/ValueConstraint result-const))
 
   Stringable
@@ -367,20 +367,29 @@
 
 (defn new-param-constraints [params]
   (assert (instance? params-ast params))
+  (apo (fn [c]
+         (cond (or (instance? c/VectorConstraint c)
+                   (instance? c/ListConstraint c))
+               (-> c
+                   (.items (vec (repeat (count (.fixed params)) c/top-type)))
+                   (.tail-c (cond (.variadic params)
+                                  (c/CollectionOf c/top-type empty-list nothing "")
+                                  c/bottom-type))
+                   (c/update-path (file-name params) (line-number params))
+                   Left)
 
-  (-> c/empty-items-constraint
-      (.items-constraints (vec (repeat (count (.fixed params)) c/top-type)))
-      (.tail-constraint (cond (.variadic params)
-                              (c/CollectionOf c/top-type empty-list nothing "")
-                              c/bottom-type))
-      (c/update-path (file-name params) (line-number params))))
+               (Right c)))
+       c/seq-constraint))
 
 (defn fn-arity
   ([params doc body]
    (fn-arity (tag "") params doc body))
   ([fn-sym params doc body]
    (fn-arity-ast fn-sym "" params doc body
-                 (new-param-constraints params) 
+                 (-> (new-param-constraints params)
+                     .alts
+                     (some (partial instance? c/ListConstraint))
+                     extract)
                  c/top-type)))
 
 (deftype fn-ast [fn-sym arities]
@@ -639,14 +648,23 @@
     (either (line-number-from-path (.path c))
             (line-number (.contents c)))))
 
-(extend-type c/ItemsConstraint
+(extend-type c/VectorConstraint
   FileLineInfo
   (file-name [c]
     (either (file-name-from-path (.path c))
-            (file-name (.items-constraints c))))
+            (file-name (.items c))))
   (line-number [c]
     (either (line-number-from-path (.path c))
-            (line-number (.items-constraints c)))))
+            (line-number (.items c)))))
+
+(extend-type c/ListConstraint
+  FileLineInfo
+  (file-name [c]
+    (either (file-name-from-path (.path c))
+            (file-name (.items c))))
+  (line-number [c]
+    (either (line-number-from-path (.path c))
+            (line-number (.items c)))))
 
 (extend-type c/StaticLengthConstraint
   FileLineInfo
@@ -682,6 +700,7 @@
   (assert (instance? params-ast params))
   (assert (instance? block-comment-ast doc))
   (assert (instance? Vector default-body))
+  (assert (instance? c/ListConstraint param-consts))
 
   Stringable
   (string-list [_] (comp (list "(" (str fn-name) " ")
@@ -709,7 +728,10 @@
 
 (defn prototype [fn-name args doc default-body]
   (prototype-ast fn-name args doc default-body
-                 (new-param-constraints args)
+                 (-> (new-param-constraints args)
+                     .alts
+                     (some (partial instance? c/ListConstraint))
+                     extract)
                  c/top-type))
 
 
