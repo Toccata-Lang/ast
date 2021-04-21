@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "4b43dee"))
+                          :sha "a65f9f4"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -514,8 +514,8 @@
 
 
 (deftype and-ast [clauses]
-  (assert (instance? (all-of Vector
-                             (min-count 1))
+  (assert (instance? (all-of (min-count 1)
+                             Vector)
                      clauses))
 
   Stringable
