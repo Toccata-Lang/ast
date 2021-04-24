@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "336671d"))
+                          :sha "0343e1c"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -373,7 +373,7 @@
                (-> c
                    (.items (vec (repeat (count (.fixed params)) c/top-type)))
                    (.tail-c (cond (.variadic params)
-                                  (c/CollectionOf c/top-type empty-list nothing "")
+                                  c/coll-of-any
                                   c/bottom-type))
                    (c/update-path (file-name params) (line-number params))
                    Left)
@@ -605,27 +605,7 @@
   (map (last path)
        (fn [[_ ln]] ln)))
 
-(extend-type c/TypeConstraint
-  FileLineInfo
-  (file-name [c]
-    (let [file (file-name (.type-sym c))]
-      (either (or (= file 'core)
-                  (and (empty? file)
-                       (file-name-from-path (.path c))))
-              file)))
-
-  (line-number [c]
-    (let [ln (line-number (.type-sym c))]
-      (either (and (= 0 ln)
-                   (line-number-from-path (.path c)))
-              ln))))
-
 (extend-type c/NoValues
-  FileLineInfo
-  (file-name [c] (file-name (.constraints c)))
-  (line-number [c] (line-number (.constraints c))))
-
-(extend-type c/MultiConstraint
   FileLineInfo
   (file-name [c] (file-name (.constraints c)))
   (line-number [c] (line-number (.constraints c))))
