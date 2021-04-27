@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "28d1365"))
+                          :sha "283961b"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -244,6 +244,8 @@
 
 
 (deftype params-ast [fixed variadic]
+  (assert (instance? Maybe variadic))
+
   Stringable
   (string-list [_]
     (comp (list "[")
