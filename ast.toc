@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "df81a95"))
+                          :sha "cb8242b"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
