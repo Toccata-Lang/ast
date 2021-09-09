@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "d634da3"))
+                          :sha "b7c19ca"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -348,11 +348,21 @@
   (string-list [_] (comp (string-list params)
                          (list "\n")
                          (flat-map (interpose body "\n") string-list)))
+  ;; (string-list [_]
+  ;;   (list "(ast/fn-arity-ast "
+  ;;         (str "'" fn-sym) " "
+  ;;         (str "'" fn-var) " "
+  ;;         (str params) "\n"
+  ;;         (str "\"" doc "\"") "\n"
+  ;;         (str body) " "
+  ;;         (str param-consts) " "
+  ;;         (str result-const)
+  ;;         ")"))
 
   Container
   (map [x f]
     (-> x
-        (.params (map params f))
+        (.params (map (f params) f))
         (.body (map body f))))
 
   (map [x f embed]
