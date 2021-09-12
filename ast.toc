@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b7c19ca"))
+                          :sha "789d3d7"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -366,6 +366,7 @@
         (.body (map body f))))
 
   (map [x f embed]
+    ;; TODO: I think this should be (flat-map (f params) f)
     (for [new-params (f params)
           new-body (-> body
                        (map f embed))]
