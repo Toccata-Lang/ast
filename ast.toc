@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "060be51"))
+                          :sha "6abe8b4"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -345,9 +345,11 @@
   (assert (instance? c/ValueConstraint result-const))
 
   Stringable
-  (string-list [_] (comp (string-list params)
-                         (list "\n")
-                         (flat-map (interpose body "\n") string-list)))
+  (string-list [_]
+    (comp (string-list params)
+          (list "\n")
+          (flat-map (interpose body "\n") string-list)))
+
   ;; (string-list [_]
   ;;   (list "(ast/fn-arity-ast "
   ;;         (str "'" fn-sym) " "
