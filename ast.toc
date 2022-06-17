@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "d43061f"))
+                          :sha "9358528"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -70,12 +70,13 @@
   (untag [x]
     (assert-result r (instance? Symbol r))))
 
-(deftype tagged-symbol [ns base sym file line]
+(deftype tagged-symbol [ns base sym file line constraint]
   (assert (instance? c/SymbolOrString file))
   (assert (instance? (maybe-of Symbol) ns))
   (assert (instance? Symbol sym))
   (assert (instance? Symbol base))
   (assert (instance? Integer line))
+  (assert (instance? c/Constraints constraint))
 
   FileLineInfo
   (file-name [s] file)
@@ -106,26 +107,26 @@
   (namespace [s] (.ns s))
   (tag [s] s)
   (tag [s new-file new-line]
-    (tagged-symbol (.ns s) (.base s) (.sym s) new-file new-line))
+    (tagged-symbol (.ns s) (.base s) (.sym s) new-file new-line c/top-type))
   (untag [s] (.base s)))
 
 (extend-type String
   Tagged
   (tag [s]
     (let [s (symbol s)]
-      (tagged-symbol nothing s s "" 0)))
+      (tagged-symbol nothing s s "" 0 c/top-type)))
   (tag [s file line]
     (let [s (symbol s)]
-      (tagged-symbol nothing s s file line))))
+      (tagged-symbol nothing s s file line c/top-type))))
 
 (extend-type Symbol
   Tagged
   (namespace [s]
     nothing)
   (tag [s]
-    (tagged-symbol nothing s s "" 0))
+    (tagged-symbol nothing s s "" 0 c/top-type))
   (tag [s file line]
-    (tagged-symbol nothing s s file line))
+    (tagged-symbol nothing s s file line c/top-type))
   (untag [s] s))
 
 (extend-type Sequence
@@ -243,7 +244,7 @@
   (inline-ast lang txt result-type path-to-file line-num))
 
 
-(deftype params-ast [fixed variadic]
+(deftype params-ast [fixed variadic constraint]
   (assert (instance? Maybe variadic))
 
   Stringable
@@ -257,24 +258,25 @@
 
   Container
   (map [x f]
-    (params-ast (map fixed f) (map variadic f)))
+    (params-ast (map fixed f) (map variadic f) c/top-type))
 
   (map [x f embed]
     (either (map variadic (fn [var]
                             (for [new-fixed (map fixed f embed)
                                   new-var (f var)]
-                              (params-ast new-fixed (maybe new-var)))))
+                              (params-ast new-fixed (maybe new-var) c/top-type))))
 
             (map (map fixed f embed)
                  (fn [new-fixed]
-                   (params-ast new-fixed nothing)))))
+                   (params-ast new-fixed nothing c/top-type)))))
 
   Tagged
   (tag [_ file line]
     (params-ast (map fixed (fn [x]
                              (tag x file line)))
                 (map variadic (fn [x]
-                                (tag x file line)))))
+                                (tag x file line)))
+                c/top-type))
 
   Collection
   (count [_] (count fixed))
@@ -287,8 +289,8 @@
                        params-ast))
 
 (defn params
-  ([fixed] (params-ast fixed nothing))
-  ([fixed variadic] (params-ast fixed variadic)))
+  ([fixed] (params-ast fixed nothing c/top-type))
+  ([fixed variadic] (params-ast fixed variadic c/top-type)))
 
 
 (deftype main-ast [params body]
@@ -339,10 +341,8 @@
   (declaration-ast sym))
 
 
-(deftype fn-arity-ast [fn-sym fn-var params doc body param-consts result-const]
+(deftype fn-arity-ast [fn-sym fn-var params doc body constraint]
   (assert (instance? tagged-symbol fn-sym))
-  (assert (instance? c/ListConstraint param-consts))
-  (assert (instance? c/ValueConstraint result-const))
 
   Stringable
   (string-list [_]
@@ -357,8 +357,6 @@
   ;;         (str params) "\n"
   ;;         (str "\"" doc "\"") "\n"
   ;;         (str body) " "
-  ;;         (str param-consts) " "
-  ;;         (str result-const)
   ;;         ")"))
 
   Container
@@ -380,32 +378,11 @@
   (file-name [_] (file-name body))
   (line-number [_] (line-number body)))
 
-(defn new-param-constraints [params]
-  (assert (instance? params-ast params))
-  (apo (fn [c]
-         (cond (or (instance? c/VectorConstraint c)
-                   (instance? c/ListConstraint c))
-               (-> c
-                   (.items (vec (repeat (count (.fixed params)) c/top-type)))
-                   (.tail-c (cond (.variadic params)
-                                  c/coll-of-any
-                                  c/bottom-type))
-                   (c/update-path (file-name params) (line-number params))
-                   Left)
-
-               (Right c)))
-       c/seq-constraint))
-
 (defn fn-arity
   ([params doc body]
    (fn-arity (tag "") params doc body))
   ([fn-sym params doc body]
-   (fn-arity-ast fn-sym "" params doc body
-                 (-> (new-param-constraints params)
-                     .alts
-                     (some (partial instance? c/ListConstraint))
-                     extract)
-                 c/top-type)))
+   (fn-arity-ast fn-sym "" params doc body c/top-type)))
 
 (deftype fn-ast [fn-sym arities]
   (assert (instance? (maybe-of tagged-symbol) fn-sym))
@@ -670,23 +647,17 @@
     (either (line-number-from-path (.path c))
             (line-number (.alts c)))))
 
-(extend-type c/ResultConstraint
-  FileLineInfo
-  (file-name [c]
-    (file-name (.assertion c)))
-  (line-number [c]
-    (line-number (.assertion c))))
+(def result-sym (tag "#result"))
 
 (defn result-expr [assertion]
-  (c/ResultConstraint assertion))
+  (c/update-sym assertion (untag result-sym)))
 
 
-(deftype prototype-ast [fn-name params doc default-body param-consts result-const]
+(deftype prototype-ast [fn-name params doc default-body]
   (assert (instance? tagged-symbol fn-name))
   (assert (instance? params-ast params))
   (assert (instance? block-comment-ast doc))
   (assert (instance? Vector default-body))
-  (assert (instance? c/ListConstraint param-consts))
 
   Stringable
   (string-list [_] (comp (list "(" (str fn-name) " ")
@@ -713,12 +684,7 @@
   (line-number [_] (line-number fn-name)))
 
 (defn prototype [fn-name args doc default-body]
-  (prototype-ast fn-name args doc default-body
-                 (-> (new-param-constraints args)
-                     .alts
-                     (some (partial instance? c/ListConstraint))
-                     extract)
-                 c/top-type))
+  (prototype-ast fn-name args doc default-body))
 
 
 (deftype protocol-ast [protocol-sym prototypes]
