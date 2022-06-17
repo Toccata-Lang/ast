@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "9358528"))
+                          :sha "9414a82"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -343,6 +343,7 @@
 
 (deftype fn-arity-ast [fn-sym fn-var params doc body constraint]
   (assert (instance? tagged-symbol fn-sym))
+  (assert (instance? c/Constraints constraint))
 
   Stringable
   (string-list [_]
@@ -384,13 +385,13 @@
   ([fn-sym params doc body]
    (fn-arity-ast fn-sym "" params doc body c/top-type)))
 
-(deftype fn-ast [fn-sym arities]
+(deftype fn-ast [fn-sym arities constraint]
   (assert (instance? (maybe-of tagged-symbol) fn-sym))
   (assert (instance? Vector arities))
 
   Type
   (type-name [x]
-    (str "fn-ast: " fn-sym))
+    (str "fn-ast: " fn-sym "\n" constraint))
 
   Stringable
   (string-list [_]
@@ -409,20 +410,20 @@
 
   Container
   (map [x f]
-    (fn-ast fn-sym (map arities f)))
+    (fn-ast fn-sym (map arities f) constraint))
 
   (map [x f embed]
     (-> arities
         (map f embed)
         (map (fn [new-arities]
-               (fn-ast fn-sym new-arities)))))
+               (fn-ast fn-sym new-arities constraint)))))
 
   FileLineInfo
   (file-name [_] (file-name arities))
   (line-number [_] (line-number arities)))
 
 (defn fn-expr [sym arities]
-  (fn-ast sym arities))
+  (fn-ast sym arities c/top-type))
 
 
 (deftype call-ast [call-target args]
@@ -653,11 +654,12 @@
   (c/update-sym assertion (untag result-sym)))
 
 
-(deftype prototype-ast [fn-name params doc default-body]
+(deftype prototype-ast [fn-name params doc default-body constraint]
   (assert (instance? tagged-symbol fn-name))
   (assert (instance? params-ast params))
   (assert (instance? block-comment-ast doc))
   (assert (instance? Vector default-body))
+  (assert (instance? c/Constraints constraint))
 
   Stringable
   (string-list [_] (comp (list "(" (str fn-name) " ")
@@ -684,7 +686,7 @@
   (line-number [_] (line-number fn-name)))
 
 (defn prototype [fn-name args doc default-body]
-  (prototype-ast fn-name args doc default-body))
+  (prototype-ast fn-name args doc default-body c/top-type))
 
 
 (deftype protocol-ast [protocol-sym prototypes]
