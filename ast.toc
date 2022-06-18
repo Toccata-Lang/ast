@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "9414a82"))
+                          :sha "38d72f3"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -84,10 +84,11 @@
 
   Container
   (map [x f]
-    x)
+    (.constraint x (map (.constraint x) f)))
 
   (map [x f embed]
-    (embed x))
+    (map (f (.constraint x))
+         (partial .constraint x)))
 
   Hashable
   (sha1 [x] (sha1 base))
@@ -426,7 +427,7 @@
   (fn-ast sym arities c/top-type))
 
 
-(deftype call-ast [call-target args]
+(deftype call-ast [call-target args constraint]
   (assert (instance? Vector args))
 
   Stringable
@@ -437,12 +438,12 @@
 
   Container
   (map [x f]
-    (call-ast (f call-target) (map args f)))
+    (call-ast (f call-target) (map args f) c/top-type))
 
   (map [x f embed]
     (for [new-target (f call-target)
           new-args (map args f embed)]
-      (call-ast new-target new-args)))
+      (call-ast new-target new-args c/top-type)))
 
   FileLineInfo
   (file-name [_]
@@ -455,7 +456,7 @@
           (line-number call-target))))
 
 (defn call-expr [[target & args]]
-  (call-ast target (vec args)))
+  (call-ast target (vec args) c/top-type))
 
 (def BindingTarget (any-of tagged-symbol
                            params-ast))
