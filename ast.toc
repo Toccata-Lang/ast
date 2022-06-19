@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "38d72f3"))
+                          :sha "26534ac"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -219,16 +219,16 @@
   (file-name [_] path-to-file)
   (line-number [_] line-num))
 
-(deftype inline-ast [lang result-type txt path-to-file line-num]
+(deftype inline-ast [lang constraint txt path-to-file line-num]
   (assert (instance? tagged-symbol lang))
-  (assert (instance? c/ValueConstraint result-type))
+  (assert (instance? c/ValueConstraint constraint))
   (assert (instance? String txt))
   (assert (instance? c/SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
 
   Stringable
   (string-list [_]
-    (list "(inline " (str lang) " " (str result-type) " \"" txt "\")"))
+    (list "(inline " (str lang) " " (str constraint) " \"" txt "\")"))
 
   Container
   (map [x f]
@@ -241,8 +241,8 @@
   (file-name [_] path-to-file)
   (line-number [_] line-num))
 
-(defn inline [lang txt result-type path-to-file line-num]
-  (inline-ast lang txt result-type path-to-file line-num))
+(defn inline [lang txt constraint path-to-file line-num]
+  (inline-ast lang txt constraint path-to-file line-num))
 
 
 (deftype params-ast [fixed variadic constraint]
@@ -775,7 +775,7 @@
   (quoted-ast q-val))
 
 
-(deftype reify-ast [type-num impls]
+(deftype reify-ast [type-num impls constraint]
   (assert (instance? (maybe-of Integer) type-num))
   (assert (instance? HashMap impls))
 
@@ -802,7 +802,7 @@
   (line-number [_] (line-number impls)))
 
 (defn reified [type-num impls]
-  (reify-ast type-num impls))
+  (reify-ast type-num impls c/top-type))
 
 (deftype cond-val-ast [conditional value]
   Stringable
