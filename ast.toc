@@ -76,7 +76,6 @@
   (assert (instance? Symbol sym))
   (assert (instance? Symbol base))
   (assert (instance? Integer line))
-  (assert (instance? c/Constraints constraint))
 
   FileLineInfo
   (file-name [s] file)
@@ -348,7 +347,8 @@
 
   Stringable
   (string-list [_]
-    (comp (string-list params)
+    (comp (list (str fn-sym) " ")
+          (string-list params)
           (list "\n")
           (flat-map (interpose body "\n") string-list)))
 
@@ -744,8 +744,8 @@
   (line-number [_] (line-number type)))
 
 (defn type-extension [type impls]
- (extend-ast type (either (map (empty? impls) (fn [_] {}))
-                          (apply comp (seq (filter impls (partial instance? HashMap)))))))
+  (extend-ast type (either (map (empty? impls) (fn [_] {}))
+                           (apply comp (seq (filter impls (partial instance? HashMap)))))))
 
 
 (deftype quoted-ast [q-val]
