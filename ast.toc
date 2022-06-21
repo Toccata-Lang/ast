@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "26534ac"))
+                          :sha "2eaf733"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -566,7 +566,7 @@
 
 
 ;; TODO: make threading into either, and, or possible
-(deftype either-ast [clause alt]
+(deftype either-ast [clause alt constraint]
   Stringable
   (string-list [_]
     (comp (list "(either ")
@@ -577,19 +577,22 @@
 
   Container
   (map [x f]
-    (either-ast (f clause) (f alt)))
+    (either-ast (map clause f)
+                (map alt f)
+                (map constraint f)))
 
   (map [x f embed]
-    (for [new-clause (f clause)
-          new-alt (f alt)]
-      (either-ast new-clause new-alt)))
+    (for [new-clause (map clause f embed)
+          new-alt (map alt f embed)
+          new-c (map constraint f embed)]
+      (either-ast new-clause new-alt new-c)))
 
   FileLineInfo
   (file-name [_] (file-name clause))
   (line-number [_] (line-number clause)))
 
 (defn either-expr [clause alt]
-  (either-ast clause alt))
+  (either-ast clause alt c/top-type))
 
 (defn file-name-from-path [path]
   (map (last path)
