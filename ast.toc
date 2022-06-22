@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "dcff0f2"))
+                          :sha "69c64b9"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -179,7 +179,7 @@
   (block-comment-ast lines path-to-file line-num))
 
 
-(deftype integer-ast [int path-to-file line-num]
+(deftype integer-ast [int path-to-file line-num constraint]
   (assert (instance? Integer int))
   (assert (instance? c/SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
@@ -189,10 +189,11 @@
 
   Container
   (map [x f]
-    x)
+    (.constraint x (f constraint)))
 
   (map [x f embed]
-    (embed x))
+    (map (f constraint)
+         (partial .constraint x)))
 
   FileLineInfo
   (file-name [_] path-to-file)
@@ -370,8 +371,7 @@
   (map [x f embed]
     ;; TODO: I think this should be (flat-map (f params) f)
     (for [new-params (f params)
-          new-body (-> body
-                       (map f embed))]
+          new-body (map body f embed)]
       (-> x
           (.params new-params)
           (.body new-body))))
@@ -482,7 +482,7 @@
 (defn binding [binding val]
   (binding-ast binding val))
 
-(deftype let-ast [bindings body]
+(deftype let-ast [bindings body constraint]
   (assert (instance? (vector-of binding-ast) bindings))
   (assert (instance? Vector body))
 
@@ -492,22 +492,23 @@
 
   Container
   (map [x f]
-    (let-ast (map bindings f) (map body f)))
+    (let-ast (map bindings f) (map body f) (f constraint)))
 
   (map [x f embed]
     (for [new-bindings (map bindings f embed)
-          new-body (map body f embed)]
-      (let-ast new-bindings new-body)))
+          new-body (map body f embed)
+          new-c (f constraint)]
+      (let-ast new-bindings new-body new-c)))
 
   FileLineInfo
   (file-name [_] (file-name body))
   (line-number [_] (line-number body)))
 
 (defn let-expr [bindings body]
-  (let-ast bindings body))
+  (let-ast bindings body c/top-type))
 
 
-(deftype and-ast [clauses]
+(deftype and-ast [clauses constraint]
   (assert (instance? (all-of (min-count 1)
                              Vector)
                      clauses))
@@ -520,11 +521,12 @@
 
   Container
   (map [x f]
-    (and-ast (map clauses f)))
+    (and-ast (map clauses f) (f constraint)))
 
   (map [x f embed]
-    (map (map clauses f embed)
-         and-ast))
+    (for [new-clauses (map clauses f embed)
+          new-c (f constraint)]
+      (and-ast new-clauses new-c)))
 
   FileLoc
   (location [_] (extract (map (first clauses) location)))
@@ -534,10 +536,10 @@
   (line-number [_] (extract (map (first clauses) line-number))))
 
 (defn and-expr [clauses]
-  (and-ast clauses))
+  (and-ast clauses c/top-type))
 
 
-(deftype or-ast [clauses]
+(deftype or-ast [clauses constraint]
   (assert (instance? Vector clauses))
 
   Stringable
@@ -548,11 +550,12 @@
 
   Container
   (map [x f]
-    (or-ast (map clauses f)))
+    (or-ast (map clauses f) (f constraint)))
 
   (map [x f embed]
-    (map (map clauses f embed)
-         or-ast))
+    (for [new-clauses (map clauses f embed)
+          new-c (f constraint)]
+      (or-ast new-clauses new-c)))
 
   FileLoc
   (location [_] (extract (map (first clauses) location)))
@@ -562,7 +565,7 @@
   (line-number [_] (extract (map (first clauses) line-number))))
 
 (defn or-expr [clauses]
-  (or-ast clauses))
+  (or-ast clauses c/top-type))
 
 
 ;; TODO: make threading into either, and, or possible
@@ -577,14 +580,14 @@
 
   Container
   (map [x f]
-    (either-ast (map clause f)
-                (map alt f)
-                (map constraint f)))
+    (either-ast (f clause)
+                (f alt)
+                (f constraint)))
 
   (map [x f embed]
-    (for [new-clause (map clause f embed)
-          new-alt (map alt f embed)
-          new-c (map constraint f embed)]
+    (for [new-clause (f clause)
+          new-alt (f alt)
+          new-c (f constraint)]
       (either-ast new-clause new-alt new-c)))
 
   FileLineInfo
@@ -807,19 +810,19 @@
 (defn reified [type-num impls]
   (reify-ast type-num impls c/top-type))
 
-(deftype cond-val-ast [conditional value]
+(deftype cond-val-ast [conditional value types]
   Stringable
   (string-list [_]
     (list (str conditional " " value)))
 
   Container
   (map [x f]
-    (cond-val-ast (f conditional) (f value)))
+    (cond-val-ast (f conditional) (f value) types))
 
   (map [x f embed]
     (for [new-cond (f conditional)
           new-value (f value)]
-      (cond-val-ast new-cond new-value)))
+      (cond-val-ast new-cond new-value types)))
 
   FileLineInfo
   (file-name [ast]
@@ -829,9 +832,10 @@
     (line-number conditional)))
 
 (defn cond-val-expr [conditional value]
-  (cond-val-ast conditional value))
+  (cond-val-ast conditional value {}))
 
-(deftype cond-ast [conditionals default]
+(deftype cond-ast [conditionals default constraint]
+  (assert (instance? (vector-of cond-val-ast) conditionals))
   (assert (instance? (min-count 1) conditionals))
 
   Stringable
@@ -842,12 +846,13 @@
 
   Container
   (map [x f]
-    (cond-ast (map conditionals f) (f default)))
+    (cond-ast (map conditionals f) (f default) (f constraint)))
 
   (map [x f embed]
     (for [new-conds (map conditionals f embed)
-          new-default (f default)]
-      (cond-ast new-conds new-default)))
+          new-default (f default)
+          new-c (f constraint)]
+      (cond-ast new-conds new-default new-c)))
 
   FileLineInfo
   (file-name [ast]
@@ -857,7 +862,7 @@
     (line-number conditionals)))
 
 (defn cond-expr [conditionals default]
-  (cond-ast conditionals default))
+  (cond-ast conditionals default c/top-type))
 
 (deftype type-ast [sym fields impls]
   (assert (instance? tagged-symbol sym))
