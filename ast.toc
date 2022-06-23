@@ -200,7 +200,7 @@
   (line-number [_] line-num))
 
 
-(deftype string-ast [string path-to-file line-num]
+(deftype string-ast [string path-to-file line-num constraint]
   (assert (instance? String string))
   (assert (instance? c/SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
@@ -210,10 +210,11 @@
 
   Container
   (map [x f]
-    x)
+    (.constraint x (f constraint)))
 
   (map [x f embed]
-    (embed x))
+    (map (f constraint)
+         (partial .constraint x)))
 
   FileLineInfo
   (file-name [_] path-to-file)
