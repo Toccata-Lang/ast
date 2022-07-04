@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "69c64b9"))
+                          :sha "bdace96"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -154,7 +154,7 @@
   (line-number [m]
     (line-number (seq m))))
 
-(deftype block-comment-ast [lines path-to-file line-num]
+(deftype block-comment-ast [lines path-to-file line-num constraint]
   (assert (instance? (vector-of String) lines))
   (assert (instance? c/SymbolOrString path-to-file))
   (assert (instance? Integer line-num))
@@ -176,7 +176,7 @@
   (line-number [_] line-num))
 
 (defn block-comment [path-to-file line-num lines]
-  (block-comment-ast lines path-to-file line-num))
+  (block-comment-ast lines path-to-file line-num c/top-type))
 
 
 (deftype integer-ast [int path-to-file line-num constraint]
@@ -755,7 +755,7 @@
                            (apply comp (seq (filter impls (partial instance? HashMap)))))))
 
 
-(deftype quoted-ast [q-val]
+(deftype quoted-ast [q-val constraint]
   Stringable
   (string-list [_]
     (list (str "'" q-val)))
@@ -768,18 +768,19 @@
 
   Container
   (map [x f]
-    (quoted-ast (f q-val)))
+    (quoted-ast (f q-val) (f constraint)))
 
   (map [x f embed]
-    (map (f q-val)
-         quoted-ast))
+    (for [new-v (f q-val)
+          new-c (f constraint)]
+      (quoted-ast new-v new-c)))
 
   FileLineInfo
   (file-name [_] (file-name q-val))
   (line-number [_] (line-number q-val)))
 
 (defn quoted [q-val]
-  (quoted-ast q-val))
+  (quoted-ast q-val c/top-type))
 
 
 (deftype reify-ast [type-num impls constraint]
