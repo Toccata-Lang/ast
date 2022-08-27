@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b2f6d5f"))
+                          :sha "0ebf75c"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -458,9 +458,6 @@
 
 (defn call-expr [[target & args]]
   (call-ast target (vec args) c/top-type))
-
-(def BindingTarget (any-of tagged-symbol
-                           params-ast))
 
 (deftype binding-ast [binding val]
   Stringable
