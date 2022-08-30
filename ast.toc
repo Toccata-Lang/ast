@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b3e1c8f"))
+                          :sha "b72498b"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -240,10 +240,11 @@
 
   Container
   (map [x f]
-    x)
+    (.constraint x (f constraint)))
 
   (map [x f embed]
-    (embed x))
+    (map (f constraint)
+         (partial .constraint x)))
 
   FileLineInfo
   (file-name [_] path-to-file)
