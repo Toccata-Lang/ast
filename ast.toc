@@ -115,7 +115,7 @@
     (list (str x)))
 
   (c/is-bottom [_]
-    constraint))
+    (c/is-bottom constraint)))
 
 (extend-type String
   Tagged
@@ -268,7 +268,18 @@
 
   Container
   (map [x f]
-    (params-ast (map fixed f) (map variadic f) c/top-type))
+    ;; TODO: call 'f' with 'constraint'
+    (let [new-var (map variadic f)]
+      (either (map (flat-map new-var
+                             (partial instance? c/ListConstraint))
+                   (fn [_]
+                     (print-err "Compiler error:" _FILE_ _LINE_
+                                "\n" 'variadic variadic
+                                "\n\n" 'f f
+                                "\n\n" 'new-var new-var)
+                     (abort)))
+              '_)
+      (params-ast (map fixed f) new-var c/top-type)))
 
   (map [x f embed]
     (either (map variadic (fn [var]
@@ -280,6 +291,9 @@
                  (fn [new-fixed]
                    (params-ast new-fixed nothing c/top-type)))))
 
+  Collection
+  (count [_] (count fixed))
+
   Tagged
   (tag [_ file line]
     (params-ast (map fixed (fn [x]
@@ -288,19 +302,27 @@
                                 (tag x file line)))
                 c/top-type))
 
-  Collection
-  (count [_] (count fixed))
-
   FileLineInfo
   (file-name [_] (file-name fixed))
-  (line-number [_] (line-number fixed)))
+  (line-number [_] (line-number fixed))
+
+  c/Constraint
+  (c/is-bottom [_]
+    (c/is-bottom constraint)))
 
 (def ParamType (any-of tagged-symbol
                        params-ast))
 
 (defn params
   ([fixed] (params-ast fixed nothing c/top-type))
-  ([fixed variadic] (params-ast fixed variadic c/top-type)))
+  ([fixed variadic]
+   ;; TODO: this should be ! (maybe-of ParamType) variadic
+   (either (or (= nothing variadic)
+               (flat-map variadic (partial instance? ParamType)))
+           (do
+             (print-err "Compiler error:" _FILE_ _LINE_ "\n" 'variadic variadic)
+             (abort)))
+   (params-ast fixed variadic c/top-type)))
 
 
 (deftype main-ast [params body]
