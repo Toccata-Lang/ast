@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "c7d4db0"))
+                          :sha "ca8b498"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -1058,3 +1058,16 @@
   IsCode
   (generates-code? [_]
     nothing))
+
+(deftype IsType [ast expected]
+  Stringable
+  (string-list [x]
+    (list "(ast/IsType " (str ast) " " (str expected) ")"))
+
+  Container
+  (map [x f]
+       (.ast x (f ast)))
+
+  (map [x f embed]
+       (map (f ast)
+            (partial .ast x))))
