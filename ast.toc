@@ -1071,3 +1071,28 @@
   (map [x f embed]
        (map (f ast)
             (partial .ast x))))
+
+(deftype GetImpl [impl-sym type-sym constraint]
+  Stringable
+  (string-list [x]
+    (list "(ast/GetImpl " (str type-sym) " " (str type-sym) ")"))
+
+  FileLineInfo
+  (file-name [_]
+    (file-name impl-sym))
+
+  (line-number [_]
+    (line-number impl-sym))
+
+  FileLoc
+  (location [_]
+    (c/Location (file-name impl-sym) (line-number impl-sym)))
+
+  Container
+  (map [x f]
+    (GetImpl (f impl-sym) type-sym (f constraint)))
+
+  (map [x f embed]
+    (for [new-impl (f impl-sym)
+          new-c (f constraint)]
+      (GetImpl new-impl type-sym new-c))))
