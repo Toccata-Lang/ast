@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "5bc17d3"))
+                          :sha "6ee3b79"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -114,8 +114,8 @@
   (c/show-full [x]
     (list (str x)))
 
-  (c/is-bottom [_]
-    (c/is-bottom constraint)))
+  (c/find-bottom [_]
+    (c/find-bottom constraint)))
 
 (extend-type String
   Tagged
@@ -307,8 +307,8 @@
   (line-number [_] (line-number fixed))
 
   c/Constraint
-  (c/is-bottom [_]
-    (c/is-bottom constraint)))
+  (c/find-bottom [_]
+    (c/find-bottom constraint)))
 
 (def ParamType (any-of tagged-symbol
                        params-ast))
@@ -675,10 +675,6 @@
             (line-number (.alts c)))))
 
 (def result-sym (tag "#result"))
-
-(defn result-expr [assertion]
-  (c/update-sym assertion (untag result-sym)))
-
 
 (deftype prototype-ast [fn-name params doc default-body constraint]
   (assert (instance? tagged-symbol fn-name))
@@ -1050,7 +1046,26 @@
   (generates-code? [ast]
     (maybe ast)))
 
-(def NoCode (any-of c/ResultConstraint
+(deftype TypeReturned [assertion]
+  Stringable
+  (string-list [_] (list "(ast/TypeReturned " (str assertion) ")"))
+
+  Container
+  (map [x f]
+    (.assertion x (f assertion)))
+
+  (map [x f embed]
+    (-> assertion
+        f
+        (map (partial .assertion x))))
+
+  Eq
+  (=* [x y]
+    (and (instance? TypeReturned y)
+         (=* assertion (.assertion y))
+         (maybe x))))
+
+(def NoCode (any-of TypeReturned
                     block-comment-ast
                     c/ValueConstraint))
 
