@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "e6e0410"))
+                          :sha "7c7dce7"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -68,7 +68,7 @@
   (tag [s file line])
 
   (untag [x]
-    (assert-result r (instance? Symbol r))))
+    (assert-result r (instance? c/OptionalSym r))))
 
 (deftype tagged-symbol [ns base sym file line constraint]
   (assert (instance? c/SymbolOrString file))
@@ -632,6 +632,10 @@
 (defn line-number-from-path [path]
   (map (last path)
        (fn [[_ ln]] ln)))
+
+(extend-type c/NoSymbol
+  Tagged
+  (untag [c] c))
 
 (extend-type c/NoValues
   FileLineInfo
