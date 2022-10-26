@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "89282ae"))
+                          :sha "6895c3d"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -116,6 +116,9 @@
 
   (c/find-bottom [_]
     (c/find-bottom constraint)))
+
+(def Tagged (any-of Symbol
+                    tagged-symbol))
 
 (extend-type String
   Tagged
