@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "55025ec"))
+                          :sha "b3724af"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -119,6 +119,10 @@
 
 (def Tagged (any-of Symbol
                     tagged-symbol))
+
+(def OptionalTagged (any-of Symbol
+                            c/NoSymbol
+                            tagged-symbol))
 
 (extend-type String
   Tagged
@@ -272,17 +276,7 @@
   Container
   (map [x f]
     ;; TODO: call 'f' with 'constraint'
-    (let [new-var (map variadic f)]
-      (either (map (flat-map new-var
-                             (partial instance? c/ListConstraint))
-                   (fn [_]
-                     (print-err "Compiler error:" _FILE_ _LINE_
-                                "\n" 'variadic variadic
-                                "\n\n" 'f f
-                                "\n\n" 'new-var new-var)
-                     (abort)))
-              '_)
-      (params-ast (map fixed f) new-var c/top-type)))
+    (params-ast (map fixed f) (map variadic f) c/top-type))
 
   (map [x f embed]
     (either (map variadic (fn [var]
@@ -399,11 +393,10 @@
   Container
   (map [x f]
     (-> x
-        (.params (map (f params) f))
+        (.params (f params))
         (.body (map body f))))
 
   (map [x f embed]
-    ;; TODO: I think this should be (flat-map (f params) f)
     (for [new-params (f params)
           new-body (map body f embed)]
       (-> x
