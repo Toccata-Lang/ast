@@ -72,7 +72,7 @@
 
 (deftype tagged-symbol [ns base sym file line constraint]
   (assert (instance? c/SymbolOrString file))
-  (assert (instance? (maybe-of Symbol) ns))
+  (assert (instance? c/OptionalSym ns))
   (assert (instance? Symbol sym))
   (assert (instance? Symbol base))
   (assert (instance? Integer line))
@@ -100,7 +100,10 @@
 
   Stringable
   (string-list [s]
-    (list (either (map (.ns s) (fn [ns-str] (str ns-str "/" (untag (.base s)))))
+    ;; (list "(ast/tagged-symbol " (str ns " " base " " sym " " file " " line "\n" constraint) ")")
+    (list (either (map (instance? Symbol (.ns s))
+                       (fn [ns-str]
+                         (str ns-str "/" (untag (.base s)))))
                   (str (untag (.base s))))))
 
   Tagged
@@ -128,19 +131,19 @@
   Tagged
   (tag [s]
     (let [s (symbol s)]
-      (tagged-symbol nothing s s "" 0 c/top-type)))
+      (tagged-symbol c/no-symbol s s "" 0 c/top-type)))
   (tag [s file line]
     (let [s (symbol s)]
-      (tagged-symbol nothing s s file line c/top-type))))
+      (tagged-symbol c/no-symbol s s file line c/top-type))))
 
 (extend-type Symbol
   Tagged
   (namespace [s]
     nothing)
   (tag [s]
-    (tagged-symbol nothing s s "" 0 c/top-type))
+    (tagged-symbol c/no-symbol s s "" 0 c/top-type))
   (tag [s file line]
-    (tagged-symbol nothing s s file line c/top-type))
+    (tagged-symbol c/no-symbol s s file line c/top-type))
   (untag [s] s))
 
 (extend-type Sequence
@@ -190,7 +193,7 @@
   (line-number [_] line-num))
 
 (defn block-comment [path-to-file line-num lines]
-  (block-comment-ast lines path-to-file line-num c/top-type))
+  (block-comment-ast (vec lines) path-to-file line-num c/top-type))
 
 
 (deftype integer-ast [int path-to-file line-num constraint]
