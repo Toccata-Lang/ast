@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "0f848e9"))
+                          :sha "98a3708"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -374,7 +374,7 @@
 
 
 (deftype fn-arity-ast [fn-sym fn-var params doc body constraint]
-  (assert (instance? tagged-symbol fn-sym))
+  (assert (instance? OptionalTagged fn-sym))
   (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
 
   Stringable
@@ -417,7 +417,7 @@
    (fn-arity-ast fn-sym "" params doc body c/top-type)))
 
 (deftype fn-ast [fn-sym arities constraint]
-  (assert (instance? (maybe-of tagged-symbol) fn-sym))
+  (assert (instance? OptionalTagged fn-sym))
   (assert (instance? Vector arities))
 
   Type
@@ -801,7 +801,7 @@
 
 
 (deftype reify-ast [type-num impls constraint]
-  (assert (instance? (maybe-of Integer) type-num))
+  (assert (instance? c/OptionalInt type-num))
   (assert (instance? HashMap impls))
 
   Stringable
