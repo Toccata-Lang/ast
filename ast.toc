@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "8a9c29a"))
+                          :sha "522bfe3"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -1093,7 +1093,7 @@
 (deftype GetImpl [impl-sym type-sym constraint]
   Stringable
   (string-list [x]
-    (list "(ast/GetImpl " (str type-sym) " " (str type-sym) ")"))
+    (list "(ast/GetImpl " (str impl-sym) " " (str type-sym) ")"))
 
   FileLineInfo
   (file-name [_]
