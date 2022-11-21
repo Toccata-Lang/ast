@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "a48f546"))
+                          :sha "8a9c29a"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -426,7 +426,7 @@
 
   Stringable
   (string-list [_]
-    (comp (list "(fn " (str (either (map fn-sym
+    (comp (list "(fn " (str (either (map (instance? Tagged fn-sym)
                                          (fn [s] (str s " ")))
                                     "")))
           (cond (= 1 (count arities))
