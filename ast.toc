@@ -634,41 +634,14 @@
   (file-name [c] (file-name (.constraints c)))
   (line-number [c] (line-number (.constraints c))))
 
-(extend-type c/CollectionOf
+(extend-type c/SymbolConstraints
   FileLineInfo
   (file-name [c]
     (either (file-name-from-path (.path c))
-            (file-name (.contents c))))
+            "<Unknown file>"))
   (line-number [c]
     (either (line-number-from-path (.path c))
-            (line-number (.contents c)))))
-
-(extend-type c/VectorConstraint
-  FileLineInfo
-  (file-name [c]
-    (either (file-name-from-path (.path c))
-            (file-name (.items c))))
-  (line-number [c]
-    (either (line-number-from-path (.path c))
-            (line-number (.items c)))))
-
-(extend-type c/ListConstraint
-  FileLineInfo
-  (file-name [c]
-    (either (file-name-from-path (.path c))
-            (file-name (.items c))))
-  (line-number [c]
-    (either (line-number-from-path (.path c))
-            (line-number (.items c)))))
-
-(extend-type c/SumConstraint
-  FileLineInfo
-  (file-name [c]
-    (either (file-name-from-path (.path c))
-            (file-name (.alts c))))
-  (line-number [c]
-    (either (line-number-from-path (.path c))
-            (line-number (.alts c)))))
+            0)))
 
 (def result-sym (tag "#result"))
 
