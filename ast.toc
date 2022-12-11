@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "bf9b8c3"))
+                          :sha "1b3d9dd"))
 
 (defprotocol FileLineInfo
   (file-name [ast]
@@ -400,8 +400,8 @@
           (.body new-body))))
 
   FileLineInfo
-  (file-name [_] (file-name body))
-  (line-number [_] (line-number body)))
+  (file-name [_] (file-name fn-sym))
+  (line-number [_] (line-number fn-sym)))
 
 (defn fn-arity
   ([params doc body]
