@@ -3,55 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "ac144e4"))
-
-(defprotocol FileLineInfo
-  (file-name [ast]
-    (assert-result x (instance? c/SymbolOrString x))
-    "")
-
-  (line-number [ast]
-    0))
-
-;; TODO: combine with FileLineInfo
-(defprotocol FileLoc
-  (location [ast]
-    (c/Location (file-name ast) (line-number ast))))
-
-(extend-type c/Location
-  FileLineInfo
-  (file-name [ast]
-    (assert-result x (instance? c/SymbolOrString x))
-    (.file ast))
-
-  (line-number [ast]
-    (.line ast)))
-
-(deftype Annotated [ast annots]
-  Stringable
-  (string-list [_]
-    (list "^" (str ast)))
-
-  Container
-  (map [a f]
-    (.ast a (f ast)))
-
-  (map [a f embed]
-    (map (f ast) (partial .ast a)))
-
-  FileLineInfo
-  (file-name [_]
-    (file-name ast))
-
-  (line-number [_]
-    (line-number ast))
-
-  FileLoc
-  (location [_]
-    (c/Location (file-name ast) (line-number ast))))
-
-(defn annotated [ast]
-  (Annotated ast 'annotations))
+                          :sha "d1d3464"))
 
 ;; we tag symbols with file/line for use later
 (defprotocol Tagged
@@ -59,119 +11,86 @@
     (assert-result r (instance? (maybe-of Symbol) r)))
 
   (tag [s]
-    (tag s "" 0))
+    (tag s c/no-location))
 
   (tag [s loc]
-    (assert (instance? c/Location loc))
-    (tag s (.file loc) (.line loc)))
+    (assert (instance? c/OptionalLoc loc)))
 
-  (tag [s file line])
+  (location [ast]))
 
-  (untag [x]
-    (assert-result r (instance? c/OptionalSym r))))
+(defprotocol AST
+  (syms [_])
+  (vars [_]
+    (assert-result r (instance? HashMap r))
 
-(deftype tagged-symbol [ns base sym file line constraint]
-  (assert (instance? c/SymbolOrString file))
+    (print-err 'boom _LINE_ _)
+    (abort)
+    {})
+  (var-str [ast]
+    (str ast)))
+
+(extend-type Vector
+  AST
+  (vars [v]
+    (merge-maps + v)))
+
+(extend-type c/NoSymbol
+  Tagged
+  (location [_] c/no-location)
+
+  AST
+  (syms [_] [])
+  (vars [_] {})
+  (var-str [s] ""))
+
+(deftype tagged-symbol [ns base sym loc]
   (assert (instance? c/OptionalSym ns))
+  (assert (instance? c/OptionalLoc loc))
   (assert (instance? Symbol sym))
   (assert (instance? Symbol base))
-  (assert (instance? Integer line))
-
-  FileLineInfo
-  (file-name [s] file)
-  (line-number [s] line)
-
-  Container
-  (map [x f]
-    (.constraint x (map (.constraint x) f)))
-
-  (map [x f embed]
-    (map (f (.constraint x))
-         (partial .constraint x)))
-
-  Hashable
-  (sha1 [x] (sha1 base))
-
-  Ord
-  (<* [_ x] (<* x base))
-
-  Eq
-  (=* [_ x] (=* x base))
 
   Stringable
   (string-list [s]
     ;; (list "(ast/tagged-symbol " (str ns " " base " " sym " " file " " line "\n" constraint) ")")
-    (list (either (map (instance? Symbol (.ns s))
-                       (fn [ns-str]
-                         (str ns-str "/" (untag (.base s)))))
-                  (str (untag (.base s))))))
+    (list (str sym)))
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
+
+  Hashable
+  (sha1 [x] (sha1 sym))
+
+  Ord
+  (<* [_ x] (<* x sym))
+
+  Eq
+  (=* [_ x] (=* x sym))
+
+  AST
+  (syms [s] [s])
+  (vars [s] {s 1})
+  (var-str [_] (str " & " base))
 
   Tagged
+  (location [_] loc)
   (namespace [s] (.ns s))
-  (tag [s] s)
-  (tag [s new-file new-line]
-    (tagged-symbol (.ns s) (.base s) (.sym s) new-file new-line c/top-type))
-  (untag [s] (.base s))
+  (tag [s new-loc] (.loc s new-loc)))
 
-  c/Constraint
-  (c/show-full [x]
-    (list (str x))))
-
-(def Tagged (any-of Symbol
-                    tagged-symbol))
-
-(def OptionalTagged (any-of Symbol
-                            c/NoSymbol
+(def OptionalTagged (any-of c/NoSymbol
                             tagged-symbol))
-
-(extend-type String
-  Tagged
-  (tag [s]
-    (let [s (symbol s)]
-      (tagged-symbol c/no-symbol s s "" 0 c/top-type)))
-  (tag [s file line]
-    (let [s (symbol s)]
-      (tagged-symbol c/no-symbol s s file line c/top-type))))
 
 (extend-type Symbol
   Tagged
-  (namespace [s]
-    nothing)
-  (tag [s]
-    (tagged-symbol c/no-symbol s s "" 0 c/top-type))
-  (tag [s file line]
-    (tagged-symbol c/no-symbol s s file line c/top-type))
-  (untag [s] s))
+  (tag [s loc]
+    (tagged-symbol c/no-symbol s s loc)))
 
-(extend-type Sequence
-  FileLineInfo
-  (file-name [v]
-    (either (some v (fn [x]
-                      (let [file (file-name x)]
-                        (and (or (= file 'core)
-                                 (first file))
-                             (maybe file)))))
-            ""))
-
-  (line-number [v]
-    (either (some v (fn [x]
-                      (let [file (file-name x)]
-                        (and (or (= file 'core)
-                                 (first file))
-                             (maybe (line-number x))))))
-            0)))
-
-(extend-type HashMap
-  FileLineInfo
-  (file-name [m]
-    (file-name (seq m)))
-  (line-number [m]
-    (line-number (seq m))))
-
-(deftype block-comment-ast [lines path-to-file line-num constraint]
+(deftype block-comment-ast [lines loc]
   (assert (instance? (vector-of String) lines))
-  (assert (instance? c/SymbolOrString path-to-file))
-  (assert (instance? Integer line-num))
+  (assert (instance? c/OptionalLoc loc))
 
   Stringable
   (string-list [_] (comp (list "<BlockCommentAST")
@@ -185,171 +104,22 @@
   (map [x f embed]
     (embed x))
 
-  FileLineInfo
-  (file-name [_] path-to-file)
-  (line-number [_] line-num))
+  Tagged
+  (tag [c new-loc]
+    (.loc c new-loc))
+  (location [x] loc))
+
+(def no-comment (block-comment-ast [] c/no-location))
 
 (defn block-comment [path-to-file line-num lines]
-  (block-comment-ast (vec lines) path-to-file line-num c/top-type))
+  (block-comment-ast (vec lines) (c/Location path-to-file line-num)))
 
-
-(deftype integer-ast [int path-to-file line-num constraint]
+(deftype integer-ast [int loc]
   (assert (instance? Integer int))
-  (assert (instance? c/SymbolOrString path-to-file))
-  (assert (instance? Integer line-num))
+  (assert (instance? c/OptionalLoc loc))
 
   Stringable
   (string-list [_] (list (str int)))
-
-  Container
-  (map [x f]
-    (.constraint x (f constraint)))
-
-  (map [x f embed]
-    (map (f constraint)
-         (partial .constraint x)))
-
-  FileLineInfo
-  (file-name [_] path-to-file)
-  (line-number [_] line-num))
-
-
-(deftype string-ast [string path-to-file line-num constraint]
-  (assert (instance? String string))
-  (assert (instance? c/SymbolOrString path-to-file))
-  (assert (instance? Integer line-num))
-
-  Stringable
-  (string-list [_] (list "\"" string "\""))
-
-  Container
-  (map [x f]
-    (.constraint x (f constraint)))
-
-  (map [x f embed]
-    (map (f constraint)
-         (partial .constraint x)))
-
-  FileLineInfo
-  (file-name [_] path-to-file)
-  (line-number [_] line-num))
-
-(deftype inline-ast [lang constraint txt path-to-file line-num]
-  (assert (instance? tagged-symbol lang))
-  (assert (instance? c/ValueConstraint constraint))
-  (assert (instance? String txt))
-  (assert (instance? c/SymbolOrString path-to-file))
-  (assert (instance? Integer line-num))
-
-  Stringable
-  (string-list [_]
-    (list "(inline " (str lang) " " (str constraint) " \"" txt "\")"))
-
-  Container
-  (map [x f]
-    (.constraint x (f constraint)))
-
-  (map [x f embed]
-    (map (f constraint)
-         (partial .constraint x)))
-
-  FileLineInfo
-  (file-name [_] path-to-file)
-  (line-number [_] line-num))
-
-(defn inline [lang txt constraint path-to-file line-num]
-  (inline-ast lang txt constraint path-to-file line-num))
-
-
-(deftype params-ast [fixed variadic constraint]
-  (assert (instance? Maybe variadic))
-
-  Stringable
-  (string-list [_]
-    (comp (list "[")
-          (flat-map (interpose fixed " ") string-list)
-          (either (map variadic (fn [variadic]
-                                  (cons " & " (string-list variadic))))
-                  empty-list)
-          (list "]")))
-
-  Container
-  (map [x f]
-    ;; TODO: call 'f' with 'constraint'
-    (params-ast (map fixed f) (map variadic f) c/top-type))
-
-  (map [x f embed]
-    (either (map variadic (fn [var]
-                            (for [new-fixed (map fixed f embed)
-                                  new-var (f var)]
-                              (params-ast new-fixed (maybe new-var) c/top-type))))
-
-            (map (map fixed f embed)
-                 (fn [new-fixed]
-                   (params-ast new-fixed nothing c/top-type)))))
-
-  Collection
-  (count [_] (count fixed))
-
-  Tagged
-  (tag [_ file line]
-    (params-ast (map fixed (fn [x]
-                             (tag x file line)))
-                (map variadic (fn [x]
-                                (tag x file line)))
-                c/top-type))
-
-  FileLineInfo
-  (file-name [_] (file-name fixed))
-  (line-number [_] (line-number fixed)))
-
-(def ParamType (any-of tagged-symbol
-                       params-ast))
-
-(defn params
-  ([fixed] (params-ast fixed nothing c/top-type))
-  ([fixed variadic]
-   ;; TODO: this should be ! (maybe-of ParamType) variadic
-   (either (or (= nothing variadic)
-               (flat-map variadic (partial instance? ParamType)))
-           (do
-             (print-err "Compiler error:" _FILE_ _LINE_ "\n" 'variadic variadic)
-             (abort)))
-   (params-ast fixed variadic c/top-type)))
-
-
-(deftype main-ast [params body]
-  (assert (instance? Vector body))
-
-  Stringable
-  (string-list [_] (comp (list "<MainAST ")
-                         (string-list params)
-                         (list " ")
-                         (string-list body)
-                         (list ">")))
-
-  Container
-  (map [x f]
-    (main-ast (f params) (map body f)))
-
-  (map [x f embed]
-    (for [new-params (f params)
-          new-body (map body f embed)]
-      (main-ast new-params new-body)))
-
-  FileLineInfo
-  (file-name [_] (file-name body))
-  (line-number [_] (line-number body)))
-
-(defn main-fn [params body]
-  (main-ast params body))
-
-
-(deftype declaration-ast [sym]
-  (assert (instance? tagged-symbol sym))
-
-  Stringable
-  (string-list [_] (list "<DeclareAST " (str sym) ">"))
 
   Container
   (map [x f]
@@ -358,22 +128,71 @@
   (map [x f embed]
     (embed x))
 
-  FileLineInfo
-  (file-name [_] (file-name sym))
-  (line-number [_] (line-number sym)))
+  Tagged
+  (tag [n new-loc]
+    (.loc n new-loc))
+  (location [x] loc))
 
-(defn declare [sym]
-  (declaration-ast sym))
+(deftype params-ast [fixed variadic]
+  Stringable
+  (string-list [_]
+    (comp (list "[")
+          (flat-map (interpose fixed " ") string-list)
+          (list (var-str variadic) "]")))
 
+  Container
+  (map [x f]
+    ;; TODO: call 'f' with 'constraint'
+    (params-ast (map fixed f) (f variadic)))
 
-(deftype fn-arity-ast [fn-sym fn-var params doc body constraint]
+  (map [x f embed]
+    (for [new-fixed (map fixed f embed)
+          new-var (f variadic)]
+      (params-ast new-fixed new-var)))
+
+  Collection
+  (count [_] (count fixed))
+
+  Tagged
+  (tag [ps new-loc]
+    (cata (fn [arg]
+            (tag arg new-loc))
+          ps))
+
+  (location [x]
+    (either (map (first fixed) location)
+            (location variadic)))
+
+  AST
+  (var-str [ps]
+    (to-str (cons " & " (string-list ps))))
+
+  (syms [_]
+    (comp (flatten fixed) variadic)))
+
+(defn all-syms [params]
+  (cata syms params))
+
+(def ParamType (any-of tagged-symbol
+                       c/NoSymbol
+                       params-ast))
+
+(defn params
+  ([fixed] (params-ast fixed c/no-symbol))
+  ([fixed variadic]
+   ;; TODO: this should be ! (maybe-of ParamType) variadic
+   (either (instance? ParamType variadic)
+           (do
+             (print-err "Compiler error:" _FILE_ _LINE_ "\n" 'variadic variadic)
+             (abort)))
+   (params-ast fixed variadic)))
+
+(deftype fn-arity-ast [fn-sym params doc body free-vars]
   (assert (instance? OptionalTagged fn-sym))
-  (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
 
   Stringable
   (string-list [_]
-    (comp (list (str fn-sym) " ")
-          (string-list params)
+    (comp (string-list params)
           (list "\n")
           (flat-map (interpose body "\n") string-list)))
 
@@ -399,29 +218,36 @@
           (.params new-params)
           (.body new-body))))
 
-  FileLineInfo
-  (file-name [_] (file-name fn-sym))
-  (line-number [_] (line-number fn-sym)))
+  AST
+  (vars [_]
+    (let [r (dissoc-all (merge-maps + body)
+                        (all-syms params))]
+      (print-err 'wtf _LINE_ r)
+      r))
 
-(defn fn-arity
-  ([params doc body]
-   (fn-arity (tag "") params doc body))
-  ([fn-sym params doc body]
-   (fn-arity-ast fn-sym "" params doc body c/top-type)))
+  Tagged
+  (tag [f new-loc]
+    (cata (fn [ast]
+            (tag ast new-loc))
+          f))
 
-(deftype fn-ast [fn-sym arities constraint]
+  (location [_]
+    (either (map (first body) location)
+            c/no-location)))
+
+(deftype fn-ast [fn-sym arities]
   (assert (instance? OptionalTagged fn-sym))
   (assert (instance? Vector arities))
 
   Type
   (type-name [x]
-    (str "fn-ast: " fn-sym "\n" constraint))
+    (str "fn-ast: " fn-sym))
 
   Stringable
   (string-list [_]
-    (comp (list "(fn " (str (either (map (instance? Tagged fn-sym)
-                                         (fn [s] (str s " ")))
-                                    "")))
+    (comp (list "(fn " (cond (instance? tagged-symbol fn-sym)
+                             (str fn-sym " ")
+                             ""))
           (cond (= 1 (count arities))
                 (flat-map (seq arities) string-list)
                 (-> (seq arities)
@@ -434,23 +260,29 @@
 
   Container
   (map [x f]
-    (fn-ast fn-sym (map arities f) constraint))
+    (fn-ast fn-sym (map arities f)))
 
   (map [x f embed]
     (-> arities
         (map f embed)
         (map (fn [new-arities]
-               (fn-ast fn-sym new-arities constraint)))))
+               (fn-ast fn-sym new-arities)))))
 
-  FileLineInfo
-  (file-name [_] (file-name arities))
-  (line-number [_] (line-number arities)))
+  AST
+  (vars [_]
+    (let [r (merge-maps + arities)]
+      (print-err 'wtf _LINE_ r)
+      r))
+
+  Tagged
+  (location [_]
+    (either (map (first arities) location)
+            c/no-location)))
 
 (defn fn-expr [sym arities]
-  (fn-ast sym arities c/top-type))
+  (fn-ast sym arities))
 
-
-(deftype call-ast [call-target args constraint]
+(deftype call-ast [call-target args]
   (assert (instance? Vector args))
 
   Stringable
@@ -461,489 +293,24 @@
 
   Container
   (map [x f]
-    (call-ast (f call-target) (map args f) c/top-type))
+    (call-ast (f call-target) (map args f)))
 
   (map [x f embed]
     (for [new-target (f call-target)
           new-args (map args f embed)]
-      (call-ast new-target new-args c/top-type)))
+      (call-ast new-target new-args)))
 
-  FileLineInfo
-  (file-name [_]
-    (cond (first args)
-          (file-name args)
-          (file-name call-target)))
-  (line-number [_]
-    (cond (first args)
-          (line-number args)
-          (line-number call-target))))
+  AST
+  (vars [ast]
+    (merge-maps + (conj args call-target)))
+
+  Tagged
+  (location [_]
+    (either (map (first args) location)
+            (location call-target))))
 
 (defn call-expr [[target & args]]
-  (call-ast target (vec args) c/top-type))
-
-(deftype binding-ast [binding val]
-  Stringable
-  (string-list [_]
-    (list (str binding) " " (str val)))
-
-  Container
-  (map [x f]
-    (binding-ast (f binding) (f val)))
-
-  (map [x f embed]
-    (for [new-val (f val)
-          new-binding (f binding)]
-      (binding-ast new-binding new-val)))
-
-  FileLineInfo
-  (file-name [_] (file-name val))
-  (line-number [_] (line-number val)))
-
-(defn binding [binding val]
-  (binding-ast binding val))
-
-(deftype let-ast [bindings body constraint]
-  (assert (instance? (vector-of binding-ast) bindings))
-  (assert (instance? Vector body))
-
-  Stringable
-  (string-list [_]
-    (list "(let [" (to-str (interpose bindings "\n")) "]\n" (apply str (interpose body "\n")) ")"))
-
-  Container
-  (map [x f]
-    (let-ast (map bindings f) (map body f) (f constraint)))
-
-  (map [x f embed]
-    (for [new-bindings (map bindings f embed)
-          new-body (map body f embed)
-          new-c (f constraint)]
-      (let-ast new-bindings new-body new-c)))
-
-  FileLineInfo
-  (file-name [_] (file-name body))
-  (line-number [_] (line-number body)))
-
-(defn let-expr [bindings body]
-  (let-ast bindings body c/top-type))
-
-
-(deftype and-ast [clauses constraint]
-  (assert (instance? (all-of (min-count 1)
-                             Vector)
-                     clauses))
-
-  Stringable
-  (string-list [_]
-    (comp (list "(and ")
-          (flat-map (interpose clauses "\n") string-list)
-          (list ")")))
-
-  Container
-  (map [x f]
-    (and-ast (map clauses f) (f constraint)))
-
-  (map [x f embed]
-    (for [new-clauses (map clauses f embed)
-          new-c (f constraint)]
-      (and-ast new-clauses new-c)))
-
-  FileLoc
-  (location [_] (extract (map (first clauses) location)))
-
-  FileLineInfo
-  (file-name [_] (extract (map (first clauses) file-name)))
-  (line-number [_] (extract (map (first clauses) line-number))))
-
-(defn and-expr [clauses]
-  (and-ast clauses c/top-type))
-
-
-(deftype or-ast [clauses constraint]
-  (assert (instance? Vector clauses))
-
-  Stringable
-  (string-list [_]
-    (comp (list "(or ")
-          (flat-map (seq clauses) string-list)
-          (list ")")))
-
-  Container
-  (map [x f]
-    (or-ast (map clauses f) (f constraint)))
-
-  (map [x f embed]
-    (for [new-clauses (map clauses f embed)
-          new-c (f constraint)]
-      (or-ast new-clauses new-c)))
-
-  FileLoc
-  (location [_] (extract (map (first clauses) location)))
-
-  FileLineInfo
-  (file-name [_] (extract (map (first clauses) file-name)))
-  (line-number [_] (extract (map (first clauses) line-number))))
-
-(defn or-expr [clauses]
-  (or-ast clauses c/top-type))
-
-
-;; TODO: make threading into either, and, or possible
-(deftype either-ast [clause alt constraint]
-  Stringable
-  (string-list [_]
-    (comp (list "(either ")
-          (string-list clause)
-          (list "\n")
-          (string-list alt)
-          (list ")")))
-
-  Container
-  (map [x f]
-    (either-ast (f clause)
-                (f alt)
-                (f constraint)))
-
-  (map [x f embed]
-    (for [new-clause (f clause)
-          new-alt (f alt)
-          new-c (f constraint)]
-      (either-ast new-clause new-alt new-c)))
-
-  FileLineInfo
-  (file-name [_] (file-name clause))
-  (line-number [_] (line-number clause)))
-
-(defn either-expr [clause alt]
-  (either-ast clause alt c/top-type))
-
-(defn file-name-from-path [path]
-  (map (last path)
-       (fn [[file]] file)))
-
-(defn line-number-from-path [path]
-  (map (last path)
-       (fn [[_ ln]] ln)))
-
-(extend-type c/NoSymbol
-  Tagged
-  (untag [c] c))
-
-(extend-type c/NoValues
-  FileLineInfo
-  (file-name [c] (file-name (.constraints c)))
-  (line-number [c] (line-number (.constraints c))))
-
-(extend-type c/SymbolConstraints
-  FileLineInfo
-  (file-name [c]
-    (either (file-name-from-path (.path c))
-            "<Unknown file>"))
-  (line-number [c]
-    (either (line-number-from-path (.path c))
-            0)))
-
-(def result-sym (tag "#result"))
-
-(deftype prototype-ast [fn-name params doc default-body constraint]
-  (assert (instance? tagged-symbol fn-name))
-  (assert (instance? params-ast params))
-  (assert (instance? block-comment-ast doc))
-  (assert (instance? Vector default-body))
-  (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
-
-  Stringable
-  (string-list [_] (comp (list "(" (str fn-name) " ")
-                         (string-list params)
-                         (list "\n")
-                         (flat-map (interpose default-body "\n") string-list)
-                         ")"))
-
-  Container
-  (map [x f]
-    (-> x
-        (.params (map params f))
-        (.default-body (map default-body f))))
-
-  (map [x f embed]
-    (for [new-params (map params f embed)
-          new-body (map default-body f embed)]
-      (-> x
-          (.params new-params)
-          (.default-body new-body))))
-
-  FileLineInfo
-  (file-name [_] (file-name fn-name))
-  (line-number [_] (line-number fn-name)))
-
-(defn prototype [fn-name args doc default-body]
-  (prototype-ast fn-name args doc default-body c/top-type))
-
-
-(deftype protocol-ast [protocol-sym prototypes]
-  (assert (instance? tagged-symbol protocol-sym))
-  (assert (instance? Vector prototypes))
-
-  Stringable
-  (string-list [_] (list "(defprotocol " (str protocol-sym) "\n"
-                         (to-str (interpose prototypes "\n"))
-                         ")"))
-
-  Container
-  (map [x f]
-    (.prototypes x (map prototypes f)))
-
-  (map [x f embed]
-    (map (map prototypes f embed)
-         (partial .prototypes x)))
-
-  FileLineInfo
-  (file-name [_] (file-name protocol-sym))
-  (line-number [_] (line-number protocol-sym)))
-
-(defn protocol [sym prototypes]
-  (protocol-ast sym prototypes))
-
-
-(deftype extend-ast [type impls]
-  (assert (instance? tagged-symbol type))
-  (assert (instance? HashMap impls))
-
-  Stringable
-  (string-list [_] (list "(extend-type " (str type)
-                         "\n" (to-str (interpose impls "\n"))
-                         ")"))
-
-  Container
-  (map [x f]
-    (.impls x (map-vals impls (fn [impl-fns]
-                                (map-vals impl-fns (fn [arities]
-                                                     (map arities f)))))))
-
-  (map [x f embed]
-    (map (contextual-map-vals impls (fn [impl-fns]
-                                      (contextual-map-vals impl-fns
-                                                           (fn [arities]
-                                                             (map arities f embed))
-                                                           embed))
-                              embed)
-         (partial .impls x)))
-
-  FileLineInfo
-  (file-name [_] (file-name type))
-  (line-number [_] (line-number type)))
-
-(defn type-extension [type impls]
-  (extend-ast type (either (map (empty? impls) (fn [_] {}))
-                           (apply comp (seq (filter impls (partial instance? HashMap)))))))
-
-
-(deftype quoted-ast [q-val constraint]
-  Stringable
-  (string-list [_]
-    (list (str "'" q-val)))
-
-  Ord
-  (<* [x y]
-    (assert (instance? quoted-ast y))
-    (and (< q-val (.q-val x))
-         (maybe x)))
-
-  Container
-  (map [x f]
-    (quoted-ast (f q-val) (f constraint)))
-
-  (map [x f embed]
-    (for [new-v (f q-val)
-          new-c (f constraint)]
-      (quoted-ast new-v new-c)))
-
-  FileLineInfo
-  (file-name [_] (file-name q-val))
-  (line-number [_] (line-number q-val)))
-
-(defn quoted [q-val]
-  (quoted-ast q-val c/top-type))
-
-
-(deftype reify-ast [type-num impls constraint]
-  (assert (instance? c/OptionalInt type-num))
-  (assert (instance? HashMap impls))
-
-  Stringable
-  (string-list [_] (list "(reify " (str type-num " \n" impls) ")"))
-
-  Container
-  (map [x f]
-    (.impls x (map-vals impls (fn [impl-fns]
-                                (map-vals impl-fns (fn [arities]
-                                                     (map arities f)))))))
-
-  (map [x f embed]
-    (map (contextual-map-vals impls (fn [impl-fns]
-                                      (contextual-map-vals impl-fns
-                                                           (fn [arities]
-                                                             (map arities f embed))
-                                                           embed))
-                              embed)
-         (partial .impls x)))
-
-  FileLineInfo
-  (file-name [_] (file-name impls))
-  (line-number [_] (line-number impls)))
-
-(defn reified [type-num impls]
-  (reify-ast type-num impls c/top-type))
-
-(deftype cond-val-ast [conditional value types]
-  Stringable
-  (string-list [_]
-    (list (str conditional " " value)))
-
-  Container
-  (map [x f]
-    (cond-val-ast (f conditional) (f value) types))
-
-  (map [x f embed]
-    (for [new-cond (f conditional)
-          new-value (f value)]
-      (cond-val-ast new-cond new-value types)))
-
-  FileLineInfo
-  (file-name [ast]
-    (file-name conditional))
-
-  (line-number [ast]
-    (line-number conditional)))
-
-(defn cond-val-expr [conditional value]
-  (cond-val-ast conditional value {}))
-
-(deftype cond-ast [conditionals default constraint]
-  (assert (instance? (vector-of cond-val-ast) conditionals))
-  (assert (instance? (min-count 1) conditionals))
-
-  Stringable
-  (string-list [_]
-    (list "(cond " (to-str (flat-map conditionals (fn [c-v]
-                                                    [(str c-v) "\n"])))
-          (str default) ")\n"))
-
-  Container
-  (map [x f]
-    (cond-ast (map conditionals f) (f default) (f constraint)))
-
-  (map [x f embed]
-    (for [new-conds (map conditionals f embed)
-          new-default (f default)
-          new-c (f constraint)]
-      (cond-ast new-conds new-default new-c)))
-
-  FileLineInfo
-  (file-name [ast]
-    (file-name conditionals))
-
-  (line-number [ast]
-    (line-number conditionals)))
-
-(defn cond-expr [conditionals default]
-  (cond-ast conditionals default c/top-type))
-
-(deftype type-ast [sym fields impls]
-  (assert (instance? tagged-symbol sym))
-  (assert (instance? params-ast fields))
-  (assert (instance? Vector impls))
-
-  Stringable
-  (string-list [_] (list "<TypeAST " (str sym) ">"))
-
-  Container
-  (map [x f]
-    (-> x
-        (.fields (map fields f))
-        (.impls (map impls
-                     (fn [proto-map]
-                       (map-vals proto-map
-                                 (fn [impls-map]
-                                   (map-vals impls-map f))))))))
-
-  (map [x f embed]
-    (for [new-fields (map fields f embed)
-          new-impls (map impls
-                         (fn [proto-map]
-                           (contextual-map-vals proto-map
-                                                (fn [impls-map]
-                                                  (contextual-map-vals impls-map
-                                                                       (fn [arity-vec]
-                                                                         (map arity-vec f embed))
-                                                                       embed))
-                                                embed))
-                         embed)]
-      (-> x
-          (.fields new-fields)
-          (.impls new-impls))))
-
-  FileLineInfo
-  (file-name [_] (file-name sym))
-  (line-number [_] (line-number sym)))
-
-(defn type-expr [sym fields impls]
-  (type-ast sym fields impls))
-
-(deftype module-ast [file-path]
-  (assert (instance? String file-path))
-
-  Container
-  (map [x f]
-    x)
-
-  (map [x f embed]
-    (embed x)))
-
-(defn module [file-path]
-  (module-ast file-path))
-
-
-(deftype git-dep-ast [repo file args]
-  (assert (instance? String repo))
-  (assert (instance? String file))
-  (assert (instance? HashMap args))
-
-  Container
-  (map [x f]
-    x)
-
-  (map [x f embed]
-    (embed x))
-
-  FileLineInfo
-  (file-name [_] (file-name repo))
-  (line-number [_] (line-number repo)))
-
-(defn git-dep [repo file args]
-  (git-dep-ast repo file args))
-
-
-(deftype add-ns-ast [ns-sym mod]
-  (assert (instance? tagged-symbol ns-sym))
-
-  Stringable
-  (string-list [_] (list "<AddNS " (str ns-sym) ">"))
-
-  Container
-  (map [x f]
-    (add-ns-ast ns-sym (f mod)))
-
-  (map [x f embed]
-    (map (f mod)
-         (partial add-ns-ast ns-sym)))
-
-  FileLineInfo
-  (file-name [_] (file-name ns-sym))
-  (line-number [_] (line-number ns-sym)))
-
-(defn ns-add [ns mod]
-  (add-ns-ast ns mod))
+  (call-ast target (vec args)))
 
 (deftype definition-ast [sym value-exprs]
   (assert (instance? tagged-symbol sym))
@@ -962,121 +329,24 @@
     (map (map (vec value-exprs) f embed)
          (partial definition-ast sym)))
 
-  FileLineInfo
-  (file-name [_] (file-name sym))
-  (line-number [_] (line-number sym)))
+  Tagged
+  (location [_] (location sym)))
 
 (defn definition [sym value]
   (definition-ast sym value))
 
-(deftype JS-callable [sym num-args]
-  Stringable
-  (string-list [_]
-    (list "(JS-callable " (str sym) ", " (str num-args) ")"))
-
-  Container
-  (map [x f]
-    x)
-
-  (map [x f embed]
-    (embed x))
-
-  FileLineInfo
-  (file-name [_] (file-name sym))
-  (line-number [_] (line-number sym)))
-
-(defprotocol IsCode
-  (generates-code? [x]))
-
-(extend-type Annotated
-  IsCode
-  (generates-code? [a]
-    (generates-code? (.ast a))))
-
-(def CodeAST (any-of inline-ast
-                     let-ast
-                     and-ast
-                     or-ast
-                     either-ast
-                     quoted-ast
-                     reify-ast
-                     call-ast
+(def CodeAST (any-of call-ast
                      fn-ast
-                     string-ast
-                     integer-ast
-                     tagged-symbol
-                     cond-ast
-                     Symbol
-                     String
-                     Integer))
+                     tagged-symbol))
 
-(extend-type CodeAST
-  IsCode
-  (generates-code? [ast]
-    (maybe ast)))
+(def NoCode block-comment-ast)
 
-(deftype TypeReturned [assertion]
-  Stringable
-  (string-list [_] (list "(ast/TypeReturned " (str assertion) ")"))
+(defn free-vars [expr]
+  (cata vars expr))
 
-  Container
-  (map [x f]
-    (.assertion x (f assertion)))
-
-  (map [x f embed]
-    (-> assertion
-        f
-        (map (partial .assertion x))))
-
-  Eq
-  (=* [x y]
-    (and (instance? TypeReturned y)
-         (=* assertion (.assertion y))
-         (maybe x))))
-
-(def NoCode (any-of TypeReturned
-                    block-comment-ast
-                    c/ValueConstraint))
-
-(extend-type NoCode
-  IsCode
-  (generates-code? [_]
-    nothing))
-
-(deftype IsType [ast expected]
-  Stringable
-  (string-list [x]
-    (list "(ast/IsType " (str ast) " " (str expected) ")"))
-
-  Container
-  (map [x f]
-       (.ast x (f ast)))
-
-  (map [x f embed]
-       (map (f ast)
-            (partial .ast x))))
-
-(deftype GetImpl [impl-sym type-sym constraint]
-  Stringable
-  (string-list [x]
-    (list "(ast/GetImpl " (str impl-sym) " " (str type-sym) ")"))
-
-  FileLineInfo
-  (file-name [_]
-    (file-name impl-sym))
-
-  (line-number [_]
-    (line-number impl-sym))
-
-  FileLoc
-  (location [_]
-    (c/Location (file-name impl-sym) (line-number impl-sym)))
-
-  Container
-  (map [x f]
-    (GetImpl (f impl-sym) type-sym (f constraint)))
-
-  (map [x f embed]
-    (for [new-impl (f impl-sym)
-          new-c (f constraint)]
-      (GetImpl new-impl type-sym new-c))))
+(defn fn-arity
+  ([params doc body]
+   (fn-arity c/no-symbol params doc body))
+  ([fn-sym params doc body]
+   (fn-arity-ast fn-sym params doc body (dissoc-all (free-vars body)
+                                                    (all-syms params)))))
