@@ -23,7 +23,7 @@
   (vars [_]
     (assert-result r (instance? HashMap r))
 
-    (print-err 'boom _LINE_ _)
+    (print-err 'boom _LINE_ (type-name _) _)
     (abort)
     {})
   (var-str [ast]
@@ -128,6 +128,9 @@
   (map [x f embed]
     (embed x))
 
+  AST
+  (vars [_] {})
+
   Tagged
   (tag [n new-loc]
     (.loc n new-loc))
@@ -208,22 +211,16 @@
   Container
   (map [x f]
     (-> x
-        (.params (f params))
         (.body (map body f))))
 
   (map [x f embed]
-    (for [new-params (f params)
-          new-body (map body f embed)]
-      (-> x
-          (.params new-params)
-          (.body new-body))))
+    (map (map body f embed)
+         (partial .body x)))
 
   AST
   (vars [_]
-    (let [r (dissoc-all (merge-maps + body)
-                        (all-syms params))]
-      (print-err 'wtf _LINE_ r)
-      r))
+    (dissoc-all (merge-maps + body)
+                (all-syms params)))
 
   Tagged
   (tag [f new-loc]
@@ -270,9 +267,7 @@
 
   AST
   (vars [_]
-    (let [r (merge-maps + arities)]
-      (print-err 'wtf _LINE_ r)
-      r))
+    (merge-maps + arities))
 
   Tagged
   (location [_]
@@ -348,5 +343,20 @@
   ([params doc body]
    (fn-arity c/no-symbol params doc body))
   ([fn-sym params doc body]
-   (fn-arity-ast fn-sym params doc body (dissoc-all (free-vars body)
-                                                    (all-syms params)))))
+   ;; TODO: adequate for lambda calc, but nothing more
+   ;; doesn't support destructured or variadic params
+   (let [new-params (map (.fixed params) (fn [param]
+                                           (assert (instance? tagged-symbol param))
+                                           [param (tag (gensym "p")
+                                                       (location param))]))
+         env (reduce new-params {} (fn [m [k v]]
+                                     (assoc m k v)))
+         params (.fixed params (map new-params (fn [[_ p]]
+                                                 p)))
+         new-body (cata (fn [x]
+                          (either (get env x)
+                                  x))
+                        body)]
+     (fn-arity-ast fn-sym params doc new-body
+                   (dissoc-all (free-vars new-body)
+                               (all-syms params))))))
