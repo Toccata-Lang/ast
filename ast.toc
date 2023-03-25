@@ -341,7 +341,8 @@
 
 (defn simple-replace [expr env]
   (cata (fn [x]
-          (either (get env x)
+          (either (and (instance? tagged-symbol x)
+                       (get env x))
                   x))
         expr))
 
