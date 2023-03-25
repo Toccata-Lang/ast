@@ -339,6 +339,12 @@
 (defn free-vars [expr]
   (cata vars expr))
 
+(defn simple-replace [expr env]
+  (cata (fn [x]
+          (either (get env x)
+                  x))
+        expr))
+
 (defn fn-arity
   ([params doc body]
    (fn-arity c/no-symbol params doc body))
@@ -347,16 +353,13 @@
    ;; doesn't support destructured or variadic params
    (let [new-params (map (.fixed params) (fn [param]
                                            (assert (instance? tagged-symbol param))
-                                           [param (tag (gensym "p")
+                                           [param (tag (gensym (str param))
                                                        (location param))]))
          env (reduce new-params {} (fn [m [k v]]
                                      (assoc m k v)))
          params (.fixed params (map new-params (fn [[_ p]]
                                                  p)))
-         new-body (cata (fn [x]
-                          (either (get env x)
-                                  x))
-                        body)]
+         new-body (simple-replace body env)]
      (fn-arity-ast fn-sym params doc new-body
                    (dissoc-all (free-vars new-body)
                                (all-syms params))))))
