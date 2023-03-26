@@ -29,6 +29,11 @@
   (var-str [ast]
     (str ast)))
 
+(extend-type Fn
+  AST
+  (vars [f]
+    {}))
+
 (extend-type Vector
   AST
   (vars [v]
@@ -196,6 +201,7 @@
   Stringable
   (string-list [_]
     (comp (string-list params)
+          ;; (list " " (str (keys free-vars)))
           (list "\n")
           (flat-map (interpose body "\n") string-list)))
 
@@ -340,16 +346,36 @@
   (cata vars expr))
 
 (defn simple-replace [expr env]
-  (cata (fn [x]
-          (either (and (instance? tagged-symbol x)
-                       (get env x))
-                  x))
-        expr))
+  (elgot (fn [x]
+           (cond (instance? fn-arity-ast x)
+                 (cond (some (keys (.free-vars x)) (partial get env))
+                       (do
+                         ;; (print-err 'not-skipping _LINE_ x
+                         ;;            "\n\n" 'free (.free-vars x))
+                         (RecurseWith x))
+
+                       (do
+                         ;; (print-err 'skipping _LINE_ x
+                         ;;            "\n\n" 'free (.free-vars x)
+                         ;;            "\n\n" 'env (keys env))
+                         (RecurseFinal x)))
+
+                 (RecurseWith x)))
+         (fn [x]
+           (either (or (and (instance? tagged-symbol x)
+                            (get env x))
+                       (map (instance? fn-arity-ast x)
+                            (fn [arity]
+                              (.free-vars arity (free-vars arity)))))
+                   x))
+         expr))
 
 (defn fn-arity
   ([params doc body]
    (fn-arity c/no-symbol params doc body))
   ([fn-sym params doc body]
+   (print-err 'fn-sym _LINE_ fn-sym params
+              "\n\n" body)
    ;; TODO: adequate for lambda calc, but nothing more
    ;; doesn't support destructured or variadic params
    (let [new-params (map (.fixed params) (fn [param]
