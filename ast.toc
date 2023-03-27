@@ -402,8 +402,6 @@
   ([params doc body]
    (fn-arity c/no-symbol params doc body))
   ([fn-sym params doc body]
-   (print-err 'fn-sym _LINE_ fn-sym params
-              "\n\n" body)
    ;; TODO: adequate for lambda calc, but nothing more
    ;; doesn't support destructured or variadic params
    (let [new-params (map (.fixed params) (fn [param]
