@@ -150,7 +150,6 @@
 
   Container
   (map [x f]
-    ;; TODO: call 'f' with 'constraint'
     (params-ast (map fixed f) (f variadic)))
 
   (map [x f embed]
@@ -194,6 +193,35 @@
              (print-err "Compiler error:" _FILE_ _LINE_ "\n" 'variadic variadic)
              (abort)))
    (params-ast fixed variadic)))
+
+(deftype binding-ast [id expr cont]
+  Stringable
+  (string-list [_]
+    (either (map (instance? Vector cont)
+                 (fn [_]
+                   (list "(let [" (str id) " " (str expr) "]\n" (to-str cont) ")")))
+            (do
+              (print-err _LINE_ (to-str (list "(let [" (str id) " " (str expr) "]\n"
+                                              (str cont) ")")))
+              (abort)
+              empty-list)))
+
+  Container
+  (map [b f]
+    (-> b
+        (.expr (f expr))
+        (.cont (f cont))))
+
+  (map [b f embed]
+    (for [new-expr (f expr)
+          new-cont (f cont)]
+      (-> b
+        (.expr new-expr)
+        (.cont new-cont))))
+
+  AST
+  (vars [_]
+    (merge-with + expr cont)))
 
 (deftype fn-arity-ast [fn-sym params doc body free-vars]
   (assert (instance? OptionalTagged fn-sym))
@@ -386,7 +414,19 @@
                                      (assoc m k v)))
          params (.fixed params (map new-params (fn [[_ p]]
                                                  p)))
-         new-body (simple-replace body env)]
-     (fn-arity-ast fn-sym params doc new-body
-                   (dissoc-all (free-vars new-body)
-                               (all-syms params))))))
+         new-body (simple-replace body env)
+         fvars (free-vars new-body)
+         param-syms (all-syms params)
+         dups (reduce param-syms {}
+                      (fn [m sym]
+                        (either (for [occurs (get fvars sym)
+                                      :when (< 1 occurs)]
+                                  (assoc m sym (tag (gensym "p") (location sym))))
+                                m)))]
+     (fn-arity-ast fn-sym
+                   (simple-replace params dups)
+                   doc
+                   (reduce (seq dups) new-body
+                           (fn [bod [dup-sym expr-sym]]
+                             [(binding-ast dup-sym expr-sym bod)]))
+                   (dissoc-all fvars (comp (vals dups) param-syms))))))
