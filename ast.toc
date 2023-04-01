@@ -73,7 +73,9 @@
   (<* [_ x] (<* x sym))
 
   Eq
-  (=* [_ x] (=* x sym))
+  (=* [ast x]
+    (and (=* x sym)
+         (maybe ast)))
 
   AST
   (syms [s] [s])
@@ -210,18 +212,18 @@
   (map [b f]
     (-> b
         (.expr (f expr))
-        (.cont (f cont))))
+        (.cont (map cont f))))
 
   (map [b f embed]
     (for [new-expr (f expr)
-          new-cont (f cont)]
+          new-cont (map cont f embed)]
       (-> b
         (.expr new-expr)
         (.cont new-cont))))
 
   AST
   (vars [_]
-    (merge-with + expr cont)))
+    (reduce cont expr (partial merge-with +))))
 
 (deftype fn-arity-ast [fn-sym params doc body free-vars]
   (assert (instance? OptionalTagged fn-sym))
@@ -312,7 +314,7 @@
   (fn-ast sym arities))
 
 (deftype call-ast [call-target args]
-  (assert (instance? Vector args))
+  ;; (assert (instance? Vector args))
 
   Stringable
   (string-list [_]
@@ -387,6 +389,9 @@
                          ;;            "\n\n" 'free (.free-vars x)
                          ;;            "\n\n" 'env (keys env))
                          (RecurseFinal x)))
+
+                 (instance? Fn x)
+                 (RecurseFinal x)
 
                  (RecurseWith x)))
          (fn [x]
