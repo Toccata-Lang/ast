@@ -20,12 +20,17 @@
 
 (defprotocol AST
   (syms [_])
+
   (vars [_]
     (assert-result r (instance? HashMap r))
 
-    (print-err 'boom _LINE_ (type-name _) _)
+    (print-err "ast/vars not defined" _LINE_ (type-name _) _)
     (abort)
     {})
+
+  (cond-string-list [ast]
+    (string-list ast))
+
   (var-str [ast]
     (str ast)))
 
@@ -221,6 +226,10 @@
         (.expr new-expr)
         (.cont new-cont))))
 
+  Tagged
+  (location [_]
+    (location id))
+
   AST
   (vars [_]
     (reduce cont expr (partial merge-with +))))
@@ -366,42 +375,54 @@
 (defn definition [sym value]
   (definition-ast sym value))
 
-(def CodeAST (any-of call-ast
-                     fn-ast
-                     tagged-symbol))
-
 (def NoCode block-comment-ast)
 
 (defn free-vars [expr]
   (cata vars expr))
 
+(defn elgot-env [co-algebra algebra x env]
+  (let [[new-x new-env] (co-algebra x env)]
+     (cond (instance? RecurseFinal new-x)
+           (.x new-x)
+
+           (-> (.x new-x)
+               (map (fn [newer-x]
+                      (elgot-env co-algebra algebra newer-x new-env)))
+               (algebra new-env)))))
+
 (defn simple-replace [expr env]
-  (elgot (fn [x]
-           (cond (instance? fn-arity-ast x)
-                 (cond (some (keys (.free-vars x)) (partial get env))
-                       (do
-                         ;; (print-err 'not-skipping _LINE_ x
-                         ;;            "\n\n" 'free (.free-vars x))
-                         (RecurseWith x))
+  (elgot-env (fn [x env]
+               (cond (instance? fn-arity-ast x)
+                     (cond (some (keys (.free-vars x)) (partial get env))
+                           (do
+                             ;; (print-err 'not-skipping _LINE_ x
+                             ;;            "\n\n" 'free (.free-vars x))
+                             [(RecurseWith x)
+                              (dissoc-all env (all-syms (.params x)))])
 
-                       (do
-                         ;; (print-err 'skipping _LINE_ x
-                         ;;            "\n\n" 'free (.free-vars x)
-                         ;;            "\n\n" 'env (keys env))
-                         (RecurseFinal x)))
+                           (do
+                             ;; (print-err 'skipping _LINE_ x
+                             ;;            "\n\n" 'free (.free-vars x)
+                             ;;            "\n\n" 'env (keys env))
+                             [(RecurseFinal x) env]))
 
-                 (instance? Fn x)
-                 (RecurseFinal x)
+                     (instance? binding-ast x)
+                     (let [new-expr (simple-replace (.expr x) env)]
+                       [(RecurseWith (.expr x new-expr))
+                        (dissoc env (.id x))])
 
-                 (RecurseWith x)))
-         (fn [x]
-           (either (or (and (instance? tagged-symbol x)
-                            (get env x))
-                       (map (instance? fn-arity-ast x)
-                            (fn [arity]
-                              (.free-vars arity (free-vars arity)))))
-                   x))
-         expr))
+                     (instance? Fn x)
+                     [(RecurseFinal x) env]
+
+                     [(RecurseWith x) env]))
+             (fn [x env]
+               (either (or (and (instance? tagged-symbol x)
+                                (get env x))
+                           (map (instance? fn-arity-ast x)
+                                (fn [arity]
+                                  (.free-vars arity (free-vars arity)))))
+                       x))
+             expr env))
 
 (defn fn-arity
   ([params doc body]
@@ -418,7 +439,8 @@
          params (.fixed params (map new-params (fn [[_ p]]
                                                  p)))
          new-body (simple-replace body env)
-         fvars (free-vars new-body)
+         ;; TODO: why does (free-vars new-body) not work
+         fvars (merge-maps + (map new-body free-vars))
          param-syms (all-syms params)
          dups (reduce param-syms {}
                       (fn [m sym]
@@ -433,3 +455,36 @@
                            (fn [bod [dup-sym expr-sym]]
                              [(binding-ast dup-sym expr-sym bod)]))
                    (dissoc-all fvars (comp (vals dups) param-syms))))))
+
+(deftype NestedCond [test clause cont]
+  Stringable
+  (string-list [_]
+    (comp (cons "(cond " (string-list test))
+          (cons "\n" (string-list clause))
+          (cons "\n\n" (cond-string-list cont))
+          (list ")")))
+
+  Container
+  (map [x f]
+    (-> x
+        (.test (f test))
+        (.clause (f clause))
+        (.cont (f cont))))
+
+  (map [x f embed]
+    (for [new-test (f test)
+          new-clause (f clause)
+          new-cont (f cont)]
+      (-> x
+        (.test new-test)
+        (.clause new-clause)
+        (.cont new-cont))))
+
+  AST
+  (vars [x]
+    (merge-with + test clause cont))
+
+  (cond-string-list [_]
+    (comp (string-list test)
+          (cons "\n" (string-list clause))
+          (cons "\n\n" (cond-string-list cont)))))
