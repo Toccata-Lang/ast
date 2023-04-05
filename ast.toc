@@ -232,7 +232,8 @@
 
   AST
   (vars [_]
-    (reduce cont expr (partial merge-with +))))
+    (dissoc (reduce cont expr (partial merge-with +))
+            id)))
 
 (deftype fn-arity-ast [fn-sym params doc body free-vars]
   (assert (instance? OptionalTagged fn-sym))
@@ -240,7 +241,7 @@
   Stringable
   (string-list [_]
     (comp (string-list params)
-          ;; (list " " (str (keys free-vars)))
+          (list " " (str free-vars))
           (list "\n")
           (flat-map (interpose body "\n") string-list)))
 
@@ -392,7 +393,10 @@
 
 (defn simple-replace [expr env]
   (elgot-env (fn [x env]
-               (cond (instance? fn-arity-ast x)
+               (cond (empty? env)
+                     [(RecurseFinal x) env]
+
+                     (instance? fn-arity-ast x)
                      (cond (some (keys (.free-vars x)) (partial get env))
                            (do
                              ;; (print-err 'not-skipping _LINE_ x
@@ -446,7 +450,9 @@
                       (fn [m sym]
                         (either (for [occurs (get fvars sym)
                                       :when (< 1 occurs)]
-                                  (assoc m sym (tag (gensym "p") (location sym))))
+                                  (do
+                                    (print-err 'sym _LINE_ sym occurs)
+                                    (assoc m sym (tag (gensym "p") (location sym)))))
                                 m)))]
      (fn-arity-ast fn-sym
                    (simple-replace params dups)
