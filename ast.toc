@@ -450,9 +450,7 @@
                       (fn [m sym]
                         (either (for [occurs (get fvars sym)
                                       :when (< 1 occurs)]
-                                  (do
-                                    (print-err 'sym _LINE_ sym occurs)
-                                    (assoc m sym (tag (gensym "p") (location sym)))))
+                                  (assoc m sym (tag (gensym "p") (location sym))))
                                 m)))]
      (fn-arity-ast fn-sym
                    (simple-replace params dups)
