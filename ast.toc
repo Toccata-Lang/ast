@@ -265,8 +265,10 @@
 
   AST
   (vars [_]
-    (dissoc-all (merge-maps + body)
-                (all-syms params)))
+    ;; (dissoc-all (merge-maps + body)
+    ;;             (all-syms params))
+    free-vars
+    )
 
   Tagged
   (tag [f new-loc]
@@ -379,7 +381,11 @@
 (def NoCode block-comment-ast)
 
 (defn free-vars [expr]
-  (cata vars expr))
+  (cond (instance? fn-arity-ast expr)
+        (dissoc-all (merge-maps + (map (.body expr) free-vars))
+                    (all-syms (.params expr)))
+
+        (cata vars expr)))
 
 (defn elgot-env [co-algebra algebra x env]
   (let [[new-x new-env] (co-algebra x env)]
