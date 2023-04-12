@@ -265,10 +265,7 @@
 
   AST
   (vars [_]
-    ;; (dissoc-all (merge-maps + body)
-    ;;             (all-syms params))
-    free-vars
-    )
+    (dissoc free-vars fn-sym))
 
   Tagged
   (tag [f new-loc]
@@ -305,13 +302,12 @@
 
   Container
   (map [x f]
-    (fn-ast fn-sym (map arities f)))
+    (.arities x (map arities f)))
 
   (map [x f embed]
     (-> arities
         (map f embed)
-        (map (fn [new-arities]
-               (fn-ast fn-sym new-arities)))))
+        (map (partial .arities x))))
 
   AST
   (vars [_]
@@ -323,7 +319,8 @@
             c/no-location)))
 
 (defn fn-expr [sym arities]
-  (fn-ast sym arities))
+  (fn-ast sym (map arities (fn [arity]
+                             (.fn-sym arity sym)))))
 
 (deftype call-ast [call-target args]
   ;; (assert (instance? Vector args))
@@ -383,7 +380,8 @@
 (defn free-vars [expr]
   (cond (instance? fn-arity-ast expr)
         (dissoc-all (merge-maps + (map (.body expr) free-vars))
-                    (all-syms (.params expr)))
+                    (conj (all-syms (.params expr))
+                          (.fn-sym expr)))
 
         (cata vars expr)))
 
