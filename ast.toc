@@ -378,12 +378,12 @@
 (def NoCode block-comment-ast)
 
 (defn free-vars [expr]
-  (cond (instance? fn-arity-ast expr)
-        (dissoc-all (merge-maps + (map (.body expr) free-vars))
-                    (conj (all-syms (.params expr))
-                          (.fn-sym expr)))
+  ;; (cond (instance? fn-arity-ast expr)
+  ;;       (dissoc-all (merge-maps + (map (.body expr) free-vars))
+  ;;                   (conj (all-syms (.params expr))
+  ;;                         (.fn-sym expr))))
 
-        (cata vars expr)))
+  (cata vars expr))
 
 (defn elgot-env [co-algebra algebra x env]
   (let [[new-x new-env] (co-algebra x env)]
@@ -400,35 +400,41 @@
                (cond (empty? env)
                      [(RecurseFinal x) env]
 
-                     (instance? fn-arity-ast x)
-                     (cond (some (keys (.free-vars x)) (partial get env))
-                           (do
-                             ;; (print-err 'not-skipping _LINE_ x
-                             ;;            "\n\n" 'free (.free-vars x))
-                             [(RecurseWith x)
-                              (dissoc-all env (all-syms (.params x)))])
+                     (instance? RecurseFinal x)
+                     [x env]
 
-                           (do
-                             ;; (print-err 'skipping _LINE_ x
-                             ;;            "\n\n" 'free (.free-vars x)
-                             ;;            "\n\n" 'env (keys env))
-                             [(RecurseFinal x) env]))
+                     (instance? fn-arity-ast x)
+                     (cond (empty? (.free-vars x))
+                           [(RecurseFinal x) env]
+
+                           (let [new-env (dissoc-all env (all-syms (.params x)))]
+                             (cond (empty? new-env)
+                                   [(RecurseFinal x) env]
+
+                                   [(RecurseWith x) new-env])))
 
                      (instance? binding-ast x)
-                     (let [new-expr (simple-replace (.expr x) env)]
-                       [(RecurseWith (.expr x new-expr))
-                        (dissoc env (.id x))])
+                     (let [new-expr (simple-replace (.expr x) env)
+                           new-env (dissoc env (.id x))]
+                       (cond (empty? new-env)
+                             [(RecurseFinal (.expr x new-expr))
+                              env]
+
+                             [(RecurseWith (.expr x (RecurseFinal new-expr)))
+                              new-env]))
 
                      (instance? Fn x)
                      [(RecurseFinal x) env]
 
                      [(RecurseWith x) env]))
              (fn [x env]
-               (either (or (and (instance? tagged-symbol x)
-                                (get env x))
-                           (map (instance? fn-arity-ast x)
+               (either (or (map (instance? fn-arity-ast x)
                                 (fn [arity]
-                                  (.free-vars arity (free-vars arity)))))
+                                  (let [body-vars (reduce (map (.body arity) free-vars) {} comp)]
+                                    (.free-vars arity (dissoc-all body-vars
+                                                                  (all-syms (.params arity)))))))
+                           (and (instance? tagged-symbol x)
+                                (get env x)))
                        x))
              expr env))
 
@@ -444,25 +450,29 @@
                                                        (location param))]))
          env (reduce new-params {} (fn [m [k v]]
                                      (assoc m k v)))
-         params (.fixed params (map new-params (fn [[_ p]]
-                                                 p)))
-         new-body (simple-replace body env)
-         ;; TODO: why does (free-vars new-body) not work
-         fvars (merge-maps + (map new-body free-vars))
+         ;; params (.fixed params (map new-params (fn [[_ p]]
+         ;;                                         p)))
          param-syms (all-syms params)
-         dups (reduce param-syms {}
-                      (fn [m sym]
-                        (either (for [occurs (get fvars sym)
-                                      :when (< 1 occurs)]
-                                  (assoc m sym (tag (gensym "p") (location sym))))
-                                m)))]
+         ;; new-body (simple-replace body env)
+         ;; TODO: why does (free-vars new-body) not work
+         ;; fvars (merge-maps + (map new-body free-vars))
+         ;; dups (reduce param-syms {}
+         ;;              (fn [m sym]
+         ;;                (either (for [occurs (get fvars sym)
+         ;;                              :when (< 1 occurs)]
+         ;;                          (assoc m sym (tag (gensym "p") (location sym))))
+         ;;                        m)))
+         ]
      (fn-arity-ast fn-sym
-                   (simple-replace params dups)
+                   ;; (simple-replace params dups)
+                   params
                    doc
-                   (reduce (seq dups) new-body
-                           (fn [bod [dup-sym expr-sym]]
-                             [(binding-ast dup-sym expr-sym bod)]))
-                   (dissoc-all fvars (comp (vals dups) param-syms))))))
+                   body
+                   ;; (reduce (seq dups) new-body
+                   ;;         (fn [bod [dup-sym expr-sym]]
+                   ;;           [(binding-ast dup-sym expr-sym bod)]))
+                   (reduce body {} (fn [m expr]
+                                     (comp m (free-vars expr))))))))
 
 (deftype NestedCond [test clause cont]
   Stringable
