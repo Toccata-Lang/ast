@@ -428,13 +428,15 @@
 
                      [(RecurseWith x) env]))
              (fn [x env]
-               (either (or (map (instance? fn-arity-ast x)
-                                (fn [arity]
-                                  (let [body-vars (reduce (map (.body arity) free-vars) {} comp)]
-                                    (.free-vars arity (dissoc-all body-vars
-                                                                  (all-syms (.params arity)))))))
-                           (and (instance? tagged-symbol x)
-                                (get env x)))
+               (either (or (and (instance? tagged-symbol x)
+                                (get env x))
+                           ;; TODO: pretty big perf hit
+                           ;; (map (instance? fn-arity-ast x)
+                           ;;      (fn [arity]
+                           ;;        (let [body-vars (reduce (map (.body arity) free-vars) {} comp)]
+                           ;;          (.free-vars arity (dissoc-all body-vars
+                           ;;                                        (all-syms (.params arity)))))))
+                           )
                        x))
              expr env))
 
@@ -471,8 +473,10 @@
                    ;; (reduce (seq dups) new-body
                    ;;         (fn [bod [dup-sym expr-sym]]
                    ;;           [(binding-ast dup-sym expr-sym bod)]))
-                   (reduce body {} (fn [m expr]
-                                     (comp m (free-vars expr))))))))
+                   (-> body
+                       (reduce {} (fn [m expr]
+                                    (comp m (free-vars expr))))
+                       (dissoc-all param-syms))))))
 
 (deftype NestedCond [test clause cont]
   Stringable
