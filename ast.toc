@@ -21,6 +21,12 @@
 (defprotocol AST
   (syms [_])
 
+  (prep-replace [x env]
+    [(RecurseWith x) env])
+
+  (replace-sym [x env]
+    x)
+
   (vars [_]
     (assert-result r (instance? HashMap r))
 
@@ -34,10 +40,40 @@
   (var-str [ast]
     (str ast)))
 
+(defn free-syms [expr]
+  (cata vars expr))
+
+(defn elgot-env [co-algebra algebra x env]
+  (let [[new-x new-env] (co-algebra x env)]
+     (cond (instance? RecurseFinal new-x)
+           (.x new-x)
+
+           (-> (.x new-x)
+               (map (fn [newer-x]
+                      (elgot-env co-algebra algebra newer-x new-env)))
+               (algebra new-env)))))
+
+(defn simple-replace [expr env]
+  (elgot-env (fn [x env]
+               (cond (empty? env)
+                     [(RecurseFinal x) env]
+
+                     (prep-replace x env)))
+             replace-sym
+             expr env))
+
 (extend-type Fn
   AST
   (vars [f]
-    {}))
+    {})
+
+  (prep-replace [x env]
+    [(RecurseFinal x) env]))
+
+(extend-type RecurseFinal
+  AST
+  (prep-replace [x env]
+    [x env]))
 
 (extend-type Vector
   AST
@@ -86,6 +122,9 @@
   (syms [s] [s])
   (vars [s] {s 1})
   (var-str [_] (str " & " base))
+  (replace-sym [x env]
+    (either (get env x)
+            x))
 
   Tagged
   (location [_] loc)
@@ -201,6 +240,57 @@
              (abort)))
    (params-ast fixed variadic)))
 
+(deftype fn-arity-ast [fn-sym params doc body free-vars]
+  (assert (instance? OptionalTagged fn-sym))
+
+  Stringable
+  (string-list [_]
+    (comp (string-list params)
+          ;; (list " " (str free-vars))
+          (list "\n")
+          (flat-map (interpose body "\n") string-list)))
+
+  ;; (string-list [_]
+  ;;   (list "(fn-a "
+  ;;         (cond (= fn-sym c/no-symbol)
+  ;;               ""
+  ;;               (str "'" fn-sym " "))
+  ;;         (str params) ;; " " (str free-vars)
+  ;;         "\n"
+  ;;         ;; (str "\"" doc "\"") "\n"
+  ;;         (to-str (flat-map (interpose body "\n") string-list))
+  ;;         ")"))
+
+  Container
+  (map [x f]
+    (-> x
+        (.body (map body f))))
+
+  (map [x f embed]
+    (map (map body f embed)
+         (partial .body x)))
+
+  AST
+  (vars [_]
+    (dissoc free-vars fn-sym))
+
+  (prep-replace [x env]
+    (let [new-env (dissoc-all env (all-syms params))]
+      (cond (empty? new-env)
+            [(RecurseFinal x) env]
+
+            [(RecurseWith x) new-env])))
+
+  Tagged
+  (tag [f new-loc]
+    (cata (fn [ast]
+            (tag ast new-loc))
+          f))
+
+  (location [_]
+    (either (map (first body) location)
+            c/no-location)))
+
 (deftype binding-ast [id expr cont]
   Stringable
   (string-list [_]
@@ -223,59 +313,27 @@
     (for [new-expr (f expr)
           new-cont (map cont f embed)]
       (-> b
-        (.expr new-expr)
-        (.cont new-cont))))
+          (.expr new-expr)
+          (.cont new-cont))))
 
   Tagged
   (location [_]
     (location id))
 
   AST
+  (prep-replace [x env]
+    (let [new-expr (simple-replace expr env)
+          new-env (dissoc env id)]
+      (cond (empty? new-env)
+            [(RecurseFinal (.expr x new-expr))
+             env]
+
+            [(RecurseWith (.expr x (RecurseFinal new-expr)))
+             new-env])))
+
   (vars [_]
     (dissoc (reduce cont expr (partial merge-with +))
             id)))
-
-(deftype fn-arity-ast [fn-sym params doc body free-vars]
-  (assert (instance? OptionalTagged fn-sym))
-
-  Stringable
-  (string-list [_]
-    (comp (string-list params)
-          (list " " (str free-vars))
-          (list "\n")
-          (flat-map (interpose body "\n") string-list)))
-
-  ;; (string-list [_]
-  ;;   (list "(ast/fn-arity-ast "
-  ;;         (str "'" fn-sym) " "
-  ;;         (str "'" fn-var) " "
-  ;;         (str params) "\n"
-  ;;         (str "\"" doc "\"") "\n"
-  ;;         (str body) " "
-  ;;         ")"))
-
-  Container
-  (map [x f]
-    (-> x
-        (.body (map body f))))
-
-  (map [x f embed]
-    (map (map body f embed)
-         (partial .body x)))
-
-  AST
-  (vars [_]
-    (dissoc free-vars fn-sym))
-
-  Tagged
-  (tag [f new-loc]
-    (cata (fn [ast]
-            (tag ast new-loc))
-          f))
-
-  (location [_]
-    (either (map (first body) location)
-            c/no-location)))
 
 (deftype fn-ast [fn-sym arities]
   (assert (instance? OptionalTagged fn-sym))
@@ -377,69 +435,6 @@
 
 (def NoCode block-comment-ast)
 
-(defn free-vars [expr]
-  ;; (cond (instance? fn-arity-ast expr)
-  ;;       (dissoc-all (merge-maps + (map (.body expr) free-vars))
-  ;;                   (conj (all-syms (.params expr))
-  ;;                         (.fn-sym expr))))
-
-  (cata vars expr))
-
-(defn elgot-env [co-algebra algebra x env]
-  (let [[new-x new-env] (co-algebra x env)]
-     (cond (instance? RecurseFinal new-x)
-           (.x new-x)
-
-           (-> (.x new-x)
-               (map (fn [newer-x]
-                      (elgot-env co-algebra algebra newer-x new-env)))
-               (algebra new-env)))))
-
-(defn simple-replace [expr env]
-  (elgot-env (fn [x env]
-               (cond (empty? env)
-                     [(RecurseFinal x) env]
-
-                     (instance? RecurseFinal x)
-                     [x env]
-
-                     (instance? fn-arity-ast x)
-                     (cond (empty? (.free-vars x))
-                           [(RecurseFinal x) env]
-
-                           (let [new-env (dissoc-all env (all-syms (.params x)))]
-                             (cond (empty? new-env)
-                                   [(RecurseFinal x) env]
-
-                                   [(RecurseWith x) new-env])))
-
-                     (instance? binding-ast x)
-                     (let [new-expr (simple-replace (.expr x) env)
-                           new-env (dissoc env (.id x))]
-                       (cond (empty? new-env)
-                             [(RecurseFinal (.expr x new-expr))
-                              env]
-
-                             [(RecurseWith (.expr x (RecurseFinal new-expr)))
-                              new-env]))
-
-                     (instance? Fn x)
-                     [(RecurseFinal x) env]
-
-                     [(RecurseWith x) env]))
-             (fn [x env]
-               (either (or (and (instance? tagged-symbol x)
-                                (get env x))
-                           ;; TODO: pretty big perf hit
-                           ;; (map (instance? fn-arity-ast x)
-                           ;;      (fn [arity]
-                           ;;        (let [body-vars (reduce (map (.body arity) free-vars) {} comp)]
-                           ;;          (.free-vars arity (dissoc-all body-vars
-                           ;;                                        (all-syms (.params arity)))))))
-                           )
-                       x))
-             expr env))
-
 (defn fn-arity
   ([params doc body]
    (fn-arity c/no-symbol params doc body))
@@ -475,7 +470,7 @@
                    ;;           [(binding-ast dup-sym expr-sym bod)]))
                    (-> body
                        (reduce {} (fn [m expr]
-                                    (comp m (free-vars expr))))
+                                    (comp m (free-syms expr))))
                        (dissoc-all param-syms))))))
 
 (deftype NestedCond [test clause cont]
