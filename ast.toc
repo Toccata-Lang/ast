@@ -470,8 +470,12 @@
                    ;;           [(binding-ast dup-sym expr-sym bod)]))
                    (-> body
                        (reduce {} (fn [m expr]
-                                    (comp m (free-syms expr))))
-                       (dissoc-all param-syms))))))
+                                    (reduce (vec (free-syms expr)) m
+                                            (fn [m [k v]]
+                                              (cond (> v 1)
+                                                    (assoc m k v)
+                                                    m)))))
+                       (select-keys param-syms))))))
 
 (deftype NestedCond [test clause cont]
   Stringable
