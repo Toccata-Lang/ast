@@ -70,10 +70,10 @@
   (prep-replace [x env]
     [(RecurseFinal x) env]))
 
-(extend-type RecurseFinal
-  AST
-  (prep-replace [x env]
-    [x env]))
+;; (extend-type RecurseFinal
+;;   AST
+;;   (prep-replace [x env]
+;;     [x env]))
 
 (extend-type Vector
   AST
@@ -133,6 +133,41 @@
 
 (def OptionalTagged (any-of c/NoSymbol
                             tagged-symbol))
+
+(deftype param-sym [sym uses]
+  (assert (instance? tagged-symbol sym))
+  (assert (instance? Integer uses))
+
+  Stringable
+  (string-list [s]
+    ;; (list "(ast/tagged-symbol " (str ns " " base " " sym " " file " " line "\n" constraint) ")")
+    (list (str sym) ;; (str "<" (address-of s) ">")
+          ))
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x))
+
+  Hashable
+  (sha1 [x] (address-of x))
+
+  Eq
+  (=* [ast x]
+    (identical ast x))
+
+  AST
+  (syms [s] [s])
+  (vars [s] {s 1})
+  (replace-sym [x env]
+    (either (get env x)
+            x))
+
+  Tagged
+  (location [_] (location sym))
+  (namespace [s] (namespace sym)))
 
 (extend-type Symbol
   Tagged
@@ -227,6 +262,7 @@
   (cata syms params))
 
 (def ParamType (any-of tagged-symbol
+                       param-sym
                        c/NoSymbol
                        params-ast))
 
@@ -441,41 +477,18 @@
   ([fn-sym params doc body]
    ;; TODO: adequate for lambda calc, but nothing more
    ;; doesn't support destructured or variadic params
-   (let [new-params (map (.fixed params) (fn [param]
-                                           (assert (instance? tagged-symbol param))
-                                           [param (tag (gensym (str param))
-                                                       (location param))]))
-         env (reduce new-params {} (fn [m [k v]]
-                                     (assoc m k v)))
-         ;; params (.fixed params (map new-params (fn [[_ p]]
-         ;;                                         p)))
+   (let [fvars (merge-maps + (map body free-syms))
          param-syms (all-syms params)
-         ;; new-body (simple-replace body env)
-         ;; TODO: why does (free-vars new-body) not work
-         ;; fvars (merge-maps + (map new-body free-vars))
-         ;; dups (reduce param-syms {}
-         ;;              (fn [m sym]
-         ;;                (either (for [occurs (get fvars sym)
-         ;;                              :when (< 1 occurs)]
-         ;;                          (assoc m sym (tag (gensym "p") (location sym))))
-         ;;                        m)))
-         ]
+         dups (reduce param-syms {}
+                      (fn [m sym]
+                        (assoc m sym (param-sym sym (either (get fvars sym)
+                                                            0)))))
+         fvars (dissoc-all fvars param-syms)]
      (fn-arity-ast fn-sym
-                   ;; (simple-replace params dups)
-                   params
+                   (simple-replace params dups)
                    doc
-                   body
-                   ;; (reduce (seq dups) new-body
-                   ;;         (fn [bod [dup-sym expr-sym]]
-                   ;;           [(binding-ast dup-sym expr-sym bod)]))
-                   (-> body
-                       (reduce {} (fn [m expr]
-                                    (reduce (vec (free-syms expr)) m
-                                            (fn [m [k v]]
-                                              (cond (> v 1)
-                                                    (assoc m k v)
-                                                    m)))))
-                       (select-keys param-syms))))))
+                   (simple-replace body dups)
+                   fvars))))
 
 (deftype NestedCond [test clause cont]
   Stringable
