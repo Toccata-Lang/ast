@@ -485,9 +485,15 @@
                                                             0)))))
          fvars (dissoc-all fvars param-syms)]
      (fn-arity-ast fn-sym
-                   (simple-replace params dups)
+                   (cata (fn [s]
+                           (either (get dups s)
+                                   s))
+                         params)
                    doc
-                   (simple-replace body dups)
+                   (cata (fn [s]
+                           (either (get dups s)
+                                   s))
+                         body)
                    fvars))))
 
 (deftype NestedCond [test clause cont]
