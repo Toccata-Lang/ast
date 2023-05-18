@@ -371,6 +371,17 @@
     (dissoc (reduce cont expr (partial merge-with +))
             id)))
 
+(defn binding-expr [id expr cont]
+  (let [fvars (merge-maps + (map cont free-syms))
+        ;; TODO hash-map literals don't seem to work
+        ps (param-sym id (either (get fvars id)
+                                 0))
+        dups (assoc {} id ps)]
+    (binding-ast ps expr (cata (fn [s]
+                                 (either (get dups s)
+                                         s))
+                               cont))))
+
 (deftype fn-ast [fn-sym arities]
   (assert (instance? OptionalTagged fn-sym))
   (assert (instance? Vector arities))
