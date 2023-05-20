@@ -276,6 +276,13 @@
              (abort)))
    (params-ast fixed variadic)))
 
+(defn same-vect [xs ys]
+  (or (and (empty? xs) (empty? ys))
+      (let [[x & xs] xs
+            [y & ys] ys]
+        (and (identical x y)
+             (same-vect (rest xs) (rest ys))))))
+
 (deftype fn-arity-ast [fn-sym params doc body free-vars]
   (assert (instance? OptionalTagged fn-sym))
 
@@ -299,12 +306,28 @@
 
   Container
   (map [x f]
-    (-> x
-        (.body (map body f))))
+    (let [idxs (int-generator)
+          new-body (reduce body body
+                           (fn [new-body expr]
+                             (let [new-expr (f expr)
+                                   idx (extract idxs)]
+                               (cond (identical new-expr expr)
+                                     new-body
+                                     (either (store new-body idx new-expr)
+                                             new-body)))))]
+      (cond (identical body new-body)
+            x
+            (.body x (map body f)))))
 
   (map [x f embed]
     (map (map body f embed)
-         (partial .body x)))
+         (fn [new-body]
+           (cond (same-vect body new-body)
+                 (do
+                   ;; TODO: this ever get called?
+                   (print-err 'no-change _LINE_ x)
+                   x)
+                 (.body x new-body)))))
 
   AST
   (vars [_]
@@ -381,7 +404,6 @@
                                  (either (get dups s)
                                          s))
                                cont))))
-
 (deftype fn-ast [fn-sym arities]
   (assert (instance? OptionalTagged fn-sym))
   (assert (instance? Vector arities))
@@ -407,12 +429,21 @@
 
   Container
   (map [x f]
-    (.arities x (map arities f)))
+    (let [new-arities (map arities f)]
+      (cond (same-vect arities new-arities) 
+            x
+            (.arities x new-arities))))
 
   (map [x f embed]
     (-> arities
         (map f embed)
-        (map (partial .arities x))))
+        (map (fn [new-arities]
+               (cond (same-vect arities new-arities)
+                     (do
+                       ;; TODO: does this ever get called
+                       (print-err 'no-change _LINE_ x)
+                       x)
+                     (.arities x new-arities))))))
 
   AST
   (vars [_]
@@ -427,23 +458,44 @@
   (fn-ast sym (map arities (fn [arity]
                              (.fn-sym arity sym)))))
 
-(deftype call-ast [call-target args]
+(deftype call-ast [call-target args reduced]
+  (assert (instance? Promise reduced))
   ;; (assert (instance? Vector args))
 
   Stringable
   (string-list [_]
     (comp (list "(" (str call-target) " ")
           (flat-map (interpose (seq args) " ") string-list)
-          (list ")")))
+          (list ;; (str " " (address-of reduced))
+                ")")))
 
   Container
   (map [x f]
-    (call-ast (f call-target) (map args f)))
+    (let [new-target (f call-target)
+          arg-idxs (int-generator)
+          new-args (reduce args args
+                           (fn [new-args arg]
+                             (let [new-arg (f arg)
+                                   arg-idx (extract arg-idxs)]
+                               (cond (identical new-arg arg)
+                                     new-args
+                                     (either (store new-args arg-idx new-arg)
+                                             new-args)))))]
+      (cond (and (identical call-target new-target)
+                   (identical args new-args))
+            x
+            (call-ast new-target new-args (promise)))))
 
   (map [x f embed]
     (for [new-target (f call-target)
           new-args (map args f embed)]
-      (call-ast new-target new-args)))
+      (cond (and (identical call-target new-target)
+                 (same-vect args new-args))
+            (do
+              ;; TODO: does this ever get called?
+              (print-err 'no-change _LINE_ x)
+              x)
+            (call-ast new-target new-args (promise)))))
 
   AST
   (vars [ast]
@@ -455,7 +507,7 @@
             (location call-target))))
 
 (defn call-expr [[target & args]]
-  (call-ast target (vec args)))
+  (call-ast target (vec args) (promise)))
 
 (deftype definition-ast [sym value-exprs]
   (assert (instance? tagged-symbol sym))
