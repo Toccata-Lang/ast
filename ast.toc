@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "1ec77e5"))
+                          :sha "08ab461"))
 
 (defprotocol FileLoc
   (location [ast]))
@@ -15,9 +15,15 @@
 (extend-type c/ValueConstraint
   FileLoc
   (location [c]
-    (either (-> (.path c)
-                last
-                (map location))
+    (either (last (.path c))
+            c/no-loc)))
+
+(extend-type Vector
+  FileLoc
+  (location [v]
+    (print-err 'wut _LINE_ v)
+    (abort)
+    (either (map (first v) location)
             c/no-loc)))
 
 ;; we tag symbols with file/line for use later
@@ -117,8 +123,8 @@
   (c/show-full [x]
     (list (str x))))
 
-(def Tagged (any-of Symbol
-                    tagged-symbol))
+(def TaggedSymbol (any-of Symbol
+                          tagged-symbol))
 
 (def OptionalTagged (any-of Symbol
                             c/NoSymbol
@@ -295,7 +301,7 @@
 
   Stringable
   (string-list [_]
-    (comp (list "(fn " (str (either (map (instance? Tagged fn-sym)
+    (comp (list "(fn " (str (either (map (instance? tagged-symbol fn-sym)
                                          (fn [s] (str s " ")))
                                     "")))
           (cond (= 1 (count arities))
