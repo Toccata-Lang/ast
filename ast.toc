@@ -3,15 +3,27 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "90b9152"))
+                          :sha "1ec77e5"))
 
 (defprotocol FileLoc
   (location [ast]))
 
+(extend-type c/NoValues
+  FileLoc
+  (location [c] (location (.constraints c))))
+
+(extend-type c/ValueConstraint
+  FileLoc
+  (location [c]
+    (either (-> (.path c)
+                last
+                (map location))
+            c/no-loc)))
+
 ;; we tag symbols with file/line for use later
 (defprotocol Tagged
   (namespace [s]
-    (assert-result r (instance? (maybe-of Symbol) r)))
+    (assert-result r (instance? c/OptionalSym r)))
 
   (tag [s loc]
     (assert (instance? c/Location loc)))
@@ -20,6 +32,24 @@
 
   (untag [x]
     (assert-result r (instance? c/OptionalSym r))))
+
+(extend-type c/NoSymbol
+  FileLoc
+  (location [_]
+    c/no-loc)
+
+  Tagged
+  (namespace [s]
+    s)
+
+  (tag [s loc]
+    s)
+
+  (tag [s]
+    s)
+
+  (untag [x]
+    x))
 
 (deftype Annotated [ast annots]
   Stringable
@@ -71,8 +101,13 @@
                          (str ns-str "/" (untag (.base s)))))
                   (str (untag (.base s))))))
 
+  FileLoc
+  (location [_]
+    loc)
+
   Tagged
-  (namespace [s] (.ns s))
+  (namespace [s]
+    (.ns s))
   (tag [s] s)
   (tag [s new-loc]
     (tagged-symbol (.ns s) (.base s) (.sym s) new-loc c/top-type))
@@ -103,7 +138,7 @@
 (extend-type Symbol
   Tagged
   (namespace [s]
-    nothing)
+    s)
   (tag [s]
     (tagged-symbol c/no-symbol s s no-loc c/top-type))
   (tag [s loc]
@@ -137,32 +172,29 @@
   (inline-ast lang txt constraint (c/Location path-to-file line-num)))
 
 (deftype params-ast [fixed variadic constraint]
-  (assert (instance? (any-of params-ast c/NoVarArg) variadic))
+  ;; (assert (instance? (any-of params-ast c/NoSymbol) variadic))
 
   Stringable
   (string-list [_]
     (comp (list "[")
           (flat-map (interpose fixed " ") string-list)
-          (cond (= c/no-var-arg variadic)
+          (cond (= c/no-symbol variadic)
                 empty-list
 
                 (cons " & " (string-list variadic)))
-          (list "]")))
+          (list "]")
+          ;; (list " <" (str fixed) " " (str variadic) ">")
+          ))
 
   Container
   (map [x f]
     ;; TODO: call 'f' with 'constraint'
-    (params-ast (map fixed f) (map variadic f) c/top-type))
+    (params-ast (map fixed f) (f variadic) c/top-type))
 
   (map [x f embed]
-    (either (map variadic (fn [var]
-                            (for [new-fixed (map fixed f embed)
-                                  new-var (f var)]
-                              (params-ast new-fixed (maybe new-var) c/top-type))))
-
-            (map (map fixed f embed)
-                 (fn [new-fixed]
-                   (params-ast new-fixed nothing c/top-type)))))
+    (for [new-fixed (map fixed f embed)
+          new-var (f variadic)]
+      (params-ast new-fixed new-var c/top-type)))
 
   Collection
   (count [_] (count fixed))
@@ -171,19 +203,21 @@
   (tag [_ loc]
     (params-ast (map fixed (fn [x]
                              (tag x loc)))
-                (map variadic (fn [x]
-                                (tag x loc)))
+                (tag variadic loc)
                 c/top-type))
 
   FileLoc
-  (location [_] (location fixed)))
+  (location [_]
+    (either (map (first fixed) location)
+            (location variadic))))
 
 (def ParamType (any-of tagged-symbol
                        params-ast))
 
 (defn params
-  ([fixed] (params-ast fixed c/no-var-arg c/top-type))
+  ([fixed] (params-ast fixed c/no-symbol c/top-type))
   ([fixed variadic]
+   (assert (instance? OptionalTagged variadic))
    (params-ast fixed variadic c/top-type)))
 
 (deftype definition-ast [sym value-exprs]
@@ -285,7 +319,9 @@
                (fn-ast fn-sym new-arities constraint)))))
 
   FileLoc
-  (location [_] (location arities)))
+  (location [_]
+    (either (map (first arities) location)
+            (location fn-sym))))
 
 (defn fn-expr [sym arities]
   (fn-ast sym arities c/top-type))
