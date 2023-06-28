@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "08ab461"))
+                          :sha "93536de"))
 
 (defprotocol FileLoc
   (location [ast]))
@@ -38,6 +38,16 @@
 
   (untag [x]
     (assert-result r (instance? c/OptionalSym r))))
+
+(extend-type c/fn-arity
+  FileLoc
+  (location [c]
+    (location (.param-consts c))))
+
+(extend-type c/NoTail
+  FileLoc
+  (location [_]
+    c/no-loc))
 
 (extend-type c/NoSymbol
   FileLoc
@@ -126,7 +136,7 @@
 (def TaggedSymbol (any-of Symbol
                           tagged-symbol))
 
-(def OptionalTagged (any-of Symbol
+(def OptionalTagged (any-of ;; Symbol
                             c/NoSymbol
                             tagged-symbol))
 
