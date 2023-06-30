@@ -607,3 +607,34 @@
 
 (defn protocol [sym prototypes]
   (protocol-ast sym prototypes))
+
+(deftype extend-ast [type impls]
+  (assert (instance? tagged-symbol type))
+  (assert (instance? HashMap impls))
+
+  Stringable
+  (string-list [_] (list "(extend-type " (str type)
+                         "\n" (to-str (interpose impls "\n"))
+                         ")"))
+
+  Container
+  (map [x f]
+    (.impls x (map-vals impls (fn [impl-fns]
+                                (map-vals impl-fns (fn [arities]
+                                                     (map arities f)))))))
+
+  (map [x f embed]
+    (map (contextual-map-vals impls (fn [impl-fns]
+                                      (contextual-map-vals impl-fns
+                                                           (fn [arities]
+                                                             (map arities f embed))
+                                                           embed))
+                              embed)
+         (partial .impls x)))
+
+  FileLoc
+  (location [_] (location type)))
+
+(defn type-extension [type impls]
+  (extend-ast type (either (map (empty? impls) (fn [_] {}))
+                           (apply comp (seq (filter impls (partial instance? HashMap)))))))
