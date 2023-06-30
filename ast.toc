@@ -161,6 +161,22 @@
     (tagged-symbol c/no-symbol s s loc c/top-type))
   (untag [s] s))
 
+(extend-type HashMap
+  FileLoc
+  (location [m]
+    (location (seq m))))
+
+(extend-type Sequence
+  FileLoc
+  (location [v]
+    (either (some v (fn [x]
+                      (let [loc (location x)]
+                        (cond (= loc no-loc)
+                              nothing
+
+                              (maybe loc)))))
+            no-loc)))
+
 (def result-sym (tag "#result"))
 
 (deftype inline-ast [lang constraint txt loc]
@@ -535,3 +551,59 @@
 
 (defn declare [sym]
   (declaration-ast sym))
+
+(deftype prototype-ast [fn-name params doc default-body constraint]
+  (assert (instance? tagged-symbol fn-name))
+  (assert (instance? params-ast params))
+  (assert (instance? block-comment-ast doc))
+  (assert (instance? Vector default-body))
+  (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
+
+  Stringable
+  (string-list [_] (comp (list "(" (str fn-name) " ")
+                         (string-list params)
+                         (list "\n")
+                         (flat-map (interpose default-body "\n") string-list)
+                         ")"))
+
+  Container
+  (map [x f]
+    (-> x
+        (.params (map params f))
+        (.default-body (map default-body f))))
+
+  (map [x f embed]
+    (for [new-params (map params f embed)
+          new-body (map default-body f embed)]
+      (-> x
+          (.params new-params)
+          (.default-body new-body))))
+
+  FileLoc
+  (location [_] (location fn-name)))
+
+(defn prototype [fn-name args doc default-body]
+  (prototype-ast fn-name args doc default-body c/top-type))
+
+(deftype protocol-ast [protocol-sym prototypes]
+  (assert (instance? tagged-symbol protocol-sym))
+  (assert (instance? Vector prototypes))
+
+  Stringable
+  (string-list [_] (list "(defprotocol " (str protocol-sym) "\n"
+                         (to-str (interpose prototypes "\n"))
+                         ")"))
+
+  Container
+  (map [x f]
+    (.prototypes x (map prototypes f)))
+
+  (map [x f embed]
+    (map (map prototypes f embed)
+         (partial .prototypes x)))
+
+  FileLoc
+  (location [_] (location protocol-sym)))
+
+(defn protocol [sym prototypes]
+  (protocol-ast sym prototypes))
