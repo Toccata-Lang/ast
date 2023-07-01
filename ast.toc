@@ -709,29 +709,37 @@
       (reduce body (fn [cont binding]
                      (.cont binding cont)))))
 
-(deftype and-ast [clauses constraint]
-  (assert (instance? (all-of (min-count 1)
-                             Vector)
-                     clauses))
-
+(deftype and-ast [clause cont types constraint]
   Stringable
   (string-list [_]
-    (comp (list "(and ")
-          (flat-map (interpose clauses "\n") string-list)
+    (comp (list "(and " (str clause) "\n")
+          (string-list cont)
           (list ")")))
 
   Container
   (map [x f]
-    (and-ast (map clauses f) (f constraint)))
+    (-> x
+        (.clause (f clause))
+        (.cont (f cont))
+        (.constraint (f constraint))))
 
   (map [x f embed]
-    (for [new-clauses (map clauses f embed)
+    (for [new-clause (f clause)
+          new-cont (f cont)
           new-c (f constraint)]
-      (and-ast new-clauses new-c)))
+      (-> x
+          (.clause new-clause)
+          (.cont new-cont)
+          (.constraint new-c))))
 
   FileLoc
   (location [_]
-    (extract (map (first clauses) location))))
+    (location clause)))
 
 (defn and-expr [clauses]
-  (and-ast clauses c/maybe-constraint))
+  (let [clauses (reverse clauses)]
+    (reduce (rest clauses)
+            (either (first clauses)
+                    (tag 'nothing))
+            (fn [cont clause]
+              (and-ast clause cont {} c/maybe-constraint)))))
