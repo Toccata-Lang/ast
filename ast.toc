@@ -743,3 +743,43 @@
                     (tag 'nothing))
             (fn [cont clause]
               (and-ast clause cont {} c/maybe-constraint)))))
+
+(deftype cond-ast [clause value cont types constraint]
+  Stringable
+  (string-list [_]
+    (list "(cond " (str clause) "\n"
+          (str value) "\n"
+          (str cont)
+          ")"))
+
+  Container
+  (map [x f]
+    (-> x
+        (.clause (f clause))
+        (.value (f value))
+        (.cont (f cont))
+        (.constraint (f constraint))))
+
+  (map [x f embed]
+    (for [new-clause (f clause)
+          new-value (f value)
+          new-cont (f cont)
+          new-c (f constraint)]
+      (-> x
+          (.clause new-clause)
+          (.value new-value)
+          (.cont new-cont)
+          (.constraint new-c))))
+
+  FileLoc
+  (location [_]
+    (location clause)))
+
+(defn cond-val-expr [clause value]
+  (cond-ast clause value (tag '_) {} c/top-type))
+
+(defn cond-expr [clause-vals default]
+  (reduce (reverse clause-vals)
+          default
+          (fn [cont clause-val]
+            (.cont clause-val cont))))
