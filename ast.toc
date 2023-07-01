@@ -638,3 +638,111 @@
 (defn type-extension [type impls]
   (extend-ast type (either (map (empty? impls) (fn [_] {}))
                            (apply comp (seq (filter impls (partial instance? HashMap)))))))
+
+;; TODO: make threading into either, and, or possible
+(deftype either-ast [clause alt constraint]
+  Stringable
+  (string-list [_]
+    (comp (list "(either ")
+          (string-list clause)
+          (list "\n")
+          (string-list alt)
+          (list ")")))
+
+  Container
+  (map [x f]
+    (either-ast (f clause)
+                (f alt)
+                (f constraint)))
+
+  (map [x f embed]
+    (for [new-clause (f clause)
+          new-alt (f alt)
+          new-c (f constraint)]
+      (either-ast new-clause new-alt new-c)))
+
+  FileLoc
+  (location [_] (location clause)))
+
+(defn either-expr [clause alt]
+  (either-ast clause alt c/top-type))
+
+(deftype binding-ast [binding val cont constraint]
+  Stringable
+  (string-list [_]
+    (list (str binding) " " (str val)
+          "\n" (str cont)))
+
+  Container
+  (map [x f]
+    (binding-ast (f binding) (f val) (f cont) constraint))
+
+  (map [x f embed]
+    (for [new-val (f val)
+          new-binding (f binding)
+          new-cont (f cont)]
+      (binding-ast new-binding new-val new-cont constraint)))
+
+  FileLoc
+  (location [_] (location val)))
+
+(defn binding [binding val]
+  (binding-ast binding val '_ c/top-type))
+
+(defn let-expr [bindings body]
+  (-> (reverse bindings)
+      (reduce body (fn [cont binding]
+                     (.cont binding cont)))))
+
+(deftype and-ast [clauses constraint]
+  (assert (instance? (all-of (min-count 1)
+                             Vector)
+                     clauses))
+
+  Stringable
+  (string-list [_]
+    (comp (list "(and ")
+          (flat-map (interpose clauses "\n") string-list)
+          (list ")")))
+
+  Container
+  (map [x f]
+    (and-ast (map clauses f) (f constraint)))
+
+  (map [x f embed]
+    (for [new-clauses (map clauses f embed)
+          new-c (f constraint)]
+      (and-ast new-clauses new-c)))
+
+  FileLoc
+  (location [_]
+    (extract (map (first clauses) location))))
+
+(defn and-expr [clauses]
+  (and-ast clauses c/maybe-constraint))
+
+(deftype cond-ast [conditional value cont]
+  Stringable
+  (string-list [_]
+    (list "(cond " (str conditional " " value
+                        "\n" cont)
+          ")"))
+
+  Container
+  (map [x f]
+    (cond-ast (f conditional) (f value) (f cont)))
+
+  (map [x f embed]
+    (for [new-cond (f conditional)
+          new-value (f value)
+          new-cont (f cont)]
+      (cond-ast new-cond new-value new-cont)))
+
+  FileLoc
+  (location [ast]
+    (location conditional)))
+
+(defn cond-expr [conditionals default]
+  (-> (reverse conditionals)
+      (reduce default (fn [cont condit]
+                        (.cont condit cont)))))
