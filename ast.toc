@@ -709,7 +709,7 @@
       (reduce body (fn [cont binding]
                      (.cont binding cont)))))
 
-(deftype and-ast [clause cont types constraint]
+(deftype and-ast [clause cont constraint]
   Stringable
   (string-list [_]
     (comp (list "(and " (str clause) "\n")
@@ -742,9 +742,9 @@
             (either (first clauses)
                     (tag 'nothing))
             (fn [cont clause]
-              (and-ast clause cont {} c/maybe-constraint)))))
+              (and-ast clause cont c/maybe-constraint)))))
 
-(deftype cond-ast [clause value cont types constraint]
+(deftype cond-ast [clause value cont constraint]
   Stringable
   (string-list [_]
     (list "(cond " (str clause) "\n"
@@ -776,10 +776,45 @@
     (location clause)))
 
 (defn cond-val-expr [clause value]
-  (cond-ast clause value (tag '_) {} c/top-type))
+  (cond-ast clause value (tag '_) c/top-type))
 
 (defn cond-expr [clause-vals default]
   (reduce (reverse clause-vals)
           default
           (fn [cont clause-val]
             (.cont clause-val cont))))
+
+(deftype or-ast [clause cont constraint]
+  Stringable
+  (string-list [_]
+    (comp (list "(or " (str clause) "\n")
+          (string-list cont)
+          (list ")")))
+
+  Container
+  (map [x f]
+    (-> x
+        (.clause (f clause))
+        (.cont (f cont))
+        (.constraint (f constraint))))
+
+  (map [x f embed]
+    (for [new-clause (f clause)
+          new-cont (f cont)
+          new-c (f constraint)]
+      (-> x
+          (.clause new-clause)
+          (.cont new-cont)
+          (.constraint new-c))))
+
+  FileLoc
+  (location [_]
+    (location clause)))
+
+(defn or-expr [clauses]
+  (let [clauses (reverse clauses)]
+    (reduce (rest clauses)
+            (either (first clauses)
+                    (tag 'nothing))
+            (fn [cont clause]
+              (or-ast clause cont c/maybe-constraint)))))
