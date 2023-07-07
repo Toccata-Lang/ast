@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b554de9"))
+                          :sha "68e9de4"))
 
 (defprotocol FileLoc
   (location [ast]))
@@ -94,11 +94,10 @@
 
   Container
   (map [x f]
-    (.constraint x (map (.constraint x) f)))
+    x)
 
   (map [x f embed]
-    (map (f (.constraint x))
-         (partial .constraint x)))
+    (embed x))
 
   Hashable
   (sha1 [x] (sha1 base))
@@ -152,6 +151,10 @@
       (tagged-symbol c/no-symbol s s loc c/top-type))))
 
 (extend-type Symbol
+  FileLoc
+  (location [_]
+    c/no-loc)
+
   Tagged
   (namespace [s]
     s)
@@ -191,11 +194,10 @@
 
   Container
   (map [x f]
-    (.constraint x (f constraint)))
+    x)
 
   (map [x f embed]
-    (map (f constraint)
-         (partial .constraint x)))
+    (embed x))
 
   FileLoc
   (location [_] loc))
@@ -220,13 +222,12 @@
 
   Container
   (map [x f]
-    (params-ast (map fixed f) (f variadic) (f constraint)))
+    (params-ast (map fixed f) (f variadic) constraint))
 
   (map [x f embed]
     (for [new-fixed (map fixed f embed)
-          new-var (f variadic)
-          new-const (f constraint)]
-      (params-ast new-fixed new-var new-const)))
+          new-var (f variadic)]
+      (params-ast new-fixed new-var constraint)))
 
   Collection
   (count [_] (count fixed))
@@ -299,17 +300,14 @@
   (map [x f]
     (-> x
         (.params (f params))
-        (.body (map body f))
-        (.constraint (f constraint))))
+        (.body (map body f))))
 
   (map [x f embed]
     (for [new-params (f params)
-          new-body (map body f embed)
-          new-const (f constraint)]
+          new-body (map body f embed)]
       (-> x
           (.params new-params)
-          (.body new-body)
-          (.constraint new-const))))
+          (.body new-body))))
 
   FileLoc
   (location [_] (location fn-sym)))
@@ -345,14 +343,13 @@
 
   Container
   (map [x f]
-    (fn-ast fn-sym (map arities f) (f constraint)))
+    (fn-ast fn-sym (map arities f) constraint))
 
   (map [x f embed]
     (for [new-arities (map arities f embed)
-          new-const (f constraint)]
+          ]
       (-> x
-          (.arities new-arities)
-          (.constraint new-const))))
+          (.arities new-arities))))
 
   FileLoc
   (location [_]
@@ -371,11 +368,10 @@
 
   Container
   (map [x f]
-    (.constraint x (f constraint)))
+    x)
 
   (map [x f embed]
-    (map (f constraint)
-         (partial .constraint x)))
+    (embed x))
 
   FileLoc
   (location [_] loc))
@@ -389,11 +385,10 @@
 
   Container
   (map [x f]
-    (.constraint x (f constraint)))
+    x)
 
   (map [x f embed]
-    (map (f constraint)
-         (partial .constraint x)))
+    (embed x))
 
   FileLoc
   (location [_] loc))
@@ -432,8 +427,7 @@
     (-> x
         (.impls (map-vals impls (fn [impl-fns]
                                   (map-vals impl-fns (fn [arities]
-                                                       (map arities f))))))
-        (.constraint (f constraint))))
+                                                       (map arities f))))))))
 
   (map [x f embed]
     (for [new-impls (contextual-map-vals impls
@@ -442,11 +436,9 @@
                                                                 (fn [arities]
                                                                   (map arities f embed))
                                                                 embed))
-                                         embed)
-          new-const (f constraint)]
+                                         embed)]
       (-> x
-          (.impls new-impls)
-          (.constraint new-const))))
+          (.impls new-impls))))
 
   FileLoc
   (location [_] (location impls)))
@@ -465,13 +457,12 @@
 
   Container
   (map [x f]
-    (call-ast (f call-target) (map args f) (f constraint)))
+    (call-ast (f call-target) (map args f) constraint))
 
   (map [x f embed]
     (for [new-target (f call-target)
-          new-args (map args f embed)
-          new-const (f constraint)]
-      (call-ast new-target new-args new-const)))
+          new-args (map args f embed)]
+      (call-ast new-target new-args constraint)))
 
   FileLoc
   (location [_]
@@ -495,12 +486,11 @@
 
   Container
   (map [x f]
-    (quoted-ast (f q-val) (f constraint)))
+    (quoted-ast (f q-val) constraint))
 
   (map [x f embed]
-    (for [new-v (f q-val)
-          new-c (f constraint)]
-      (quoted-ast new-v new-c)))
+    (for [new-v (f q-val)]
+      (quoted-ast new-v constraint)))
 
   FileLoc
   (location [_] (location q-val)))
@@ -581,17 +571,14 @@
   (map [x f]
     (-> x
         (.params (map params f))
-        (.default-body (map default-body f))
-        (.constraint (f constraint))))
+        (.default-body (map default-body f))))
 
   (map [x f embed]
     (for [new-params (map params f embed)
-          new-body (map default-body f embed)
-          new-const (f constraint)]
+          new-body (map default-body f embed)]
       (-> x
           (.params new-params)
-          (.default-body new-body)
-          (.constraint new-const))))
+          (.default-body new-body))))
 
   FileLoc
   (location [_] (location fn-name)))
@@ -667,13 +654,12 @@
   (map [x f]
     (either-ast (f clause)
                 (f alt)
-                (f constraint)))
+                constraint))
 
   (map [x f embed]
     (for [new-clause (f clause)
-          new-alt (f alt)
-          new-c (f constraint)]
-      (either-ast new-clause new-alt new-c)))
+          new-alt (f alt)]
+      (either-ast new-clause new-alt constraint)))
 
   FileLoc
   (location [_] (location clause)))
@@ -689,14 +675,13 @@
 
   Container
   (map [x f]
-    (binding-ast (f binding) (f val) (f cont) (f constraint)))
+    (binding-ast (f binding) (f val) (f cont) constraint))
 
   (map [x f embed]
     (for [new-val (f val)
           new-binding (f binding)
-          new-cont (f cont)
-          new-const (f constraint)]
-      (binding-ast new-binding new-val new-cont new-const)))
+          new-cont (f cont)]
+      (binding-ast new-binding new-val new-cont constraint)))
 
   FileLoc
   (location [_] (location val)))
@@ -720,17 +705,14 @@
   (map [x f]
     (-> x
         (.clause (f clause))
-        (.cont (f cont))
-        (.constraint (f constraint))))
+        (.cont (f cont))))
 
   (map [x f embed]
     (for [new-clause (f clause)
-          new-cont (f cont)
-          new-c (f constraint)]
+          new-cont (f cont)]
       (-> x
           (.clause new-clause)
-          (.cont new-cont)
-          (.constraint new-c))))
+          (.cont new-cont))))
 
   FileLoc
   (location [_]
@@ -757,19 +739,16 @@
     (-> x
         (.clause (f clause))
         (.value (f value))
-        (.cont (f cont))
-        (.constraint (f constraint))))
+        (.cont (f cont))))
 
   (map [x f embed]
     (for [new-clause (f clause)
           new-value (f value)
-          new-cont (f cont)
-          new-c (f constraint)]
+          new-cont (f cont)]
       (-> x
           (.clause new-clause)
           (.value new-value)
-          (.cont new-cont)
-          (.constraint new-c))))
+          (.cont new-cont))))
 
   FileLoc
   (location [_]
@@ -795,17 +774,14 @@
   (map [x f]
     (-> x
         (.clause (f clause))
-        (.cont (f cont))
-        (.constraint (f constraint))))
+        (.cont (f cont))))
 
   (map [x f embed]
     (for [new-clause (f clause)
-          new-cont (f cont)
-          new-c (f constraint)]
+          new-cont (f cont)]
       (-> x
           (.clause new-clause)
-          (.cont new-cont)
-          (.constraint new-c))))
+          (.cont new-cont))))
 
   FileLoc
   (location [_]
@@ -818,3 +794,40 @@
                     (tag 'nothing))
             (fn [cont clause]
               (or-ast clause cont c/maybe-constraint)))))
+
+
+
+(deftype IsType [ast expected]
+  Stringable
+  (string-list [x]
+    (list "(ast/IsType " (str ast) " " (str expected) ")"))
+
+  Container
+  (map [x f]
+       (.ast x (f ast)))
+
+  (map [x f embed]
+       (map (f ast)
+            (partial .ast x)))
+
+  FileLoc
+  (location [_]
+    (location ast)))
+
+(deftype GetImpl [impl-sym type-sym constraint]
+  Stringable
+  (string-list [x]
+    (list "(ast/GetImpl " (str impl-sym) " " (str type-sym) ")"))
+
+  FileLoc
+  (location [_]
+    (location impl-sym))
+
+  Container
+  (map [x f]
+    (GetImpl (f impl-sym) type-sym (f constraint)))
+
+  (map [x f embed]
+    (for [new-impl (f impl-sym)
+          new-c (f constraint)]
+      (GetImpl new-impl type-sym new-c))))
