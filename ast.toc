@@ -10,13 +10,19 @@
 
 (extend-type c/NoValues
   FileLoc
-  (location [c] (location (.constraints c))))
+  (location [c]
+    (location (.constraints c))))
 
 (extend-type c/ValueConstraint
   FileLoc
   (location [c]
     (either (last (.path c))
             c/no-loc)))
+
+(extend-type c/Field
+  FileLoc
+  (location [c]
+    c/no-loc))
 
 (extend-type Vector
   FileLoc
@@ -831,3 +837,43 @@
     (for [new-impl (f impl-sym)
           new-c (f constraint)]
       (GetImpl new-impl type-sym new-c))))
+
+(deftype type-ast [sym fields impls]
+  (assert (instance? tagged-symbol sym))
+  (assert (instance? params-ast fields))
+  (assert (instance? Vector impls))
+
+  Stringable
+  (string-list [_] (list "<TypeAST " (str sym) ">"))
+
+  Container
+  (map [x f]
+    (-> x
+        (.fields (map fields f))
+        (.impls (map impls
+                     (fn [proto-map]
+                       (map-vals proto-map
+                                 (fn [impls-map]
+                                   (map-vals impls-map f))))))))
+
+  (map [x f embed]
+    (for [new-fields (map fields f embed)
+          new-impls (map impls
+                         (fn [proto-map]
+                           (contextual-map-vals proto-map
+                                                (fn [impls-map]
+                                                  (contextual-map-vals impls-map
+                                                                       (fn [arity-vec]
+                                                                         (map arity-vec f embed))
+                                                                       embed))
+                                                embed))
+                         embed)]
+      (-> x
+          (.fields new-fields)
+          (.impls new-impls))))
+
+  FileLoc
+  (location [_] (location sym)))
+
+(defn type-expr [sym fields impls]
+  (type-ast sym fields impls))
