@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "a242115"))
+                          :sha "2dfd6af"))
 
 (defprotocol FileLoc
   (location [ast]))
@@ -894,3 +894,28 @@
   FileLoc
   (location [_]
     (location sym)))
+
+(deftype main-ast [params body]
+  (assert (instance? Vector body))
+
+  Stringable
+  (string-list [_] (comp (list "<MainAST ")
+                         (string-list params)
+                         (list " ")
+                         (string-list body)
+                         (list ">")))
+
+  Container
+  (map [x f]
+    (main-ast (f params) (map body f)))
+
+  (map [x f embed]
+    (for [new-params (f params)
+          new-body (map body f embed)]
+      (main-ast new-params new-body)))
+
+  FileLoc
+  (location [_] (location body)))
+
+(defn main-fn [params body]
+  (main-ast params body))
