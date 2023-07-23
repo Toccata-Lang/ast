@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "d0ce206"))
+                          :sha "7c85dc8"))
 
 (defprotocol FileLoc
   (location [ast]))
@@ -37,15 +37,6 @@
     (either (map (first v) location)
             c/no-loc)))
 
-;; we tag symbols with file/line for use later
-(defprotocol Tagged
-  (namespace [s])
-
-  (tag [s loc]
-    (assert (instance? c/Location loc)))
-
-  (tag [s]))
-
 (extend-type c/fn-arity
   FileLoc
   (location [c]
@@ -59,17 +50,7 @@
 (extend-type c/NoSymbol
   FileLoc
   (location [_]
-    c/no-loc)
-
-  Tagged
-  (namespace [s]
-    s)
-
-  (tag [s loc]
-    s)
-
-  (tag [s]
-    s))
+    c/no-loc))
 
 (deftype Annotated [ast annots]
   Stringable
@@ -93,36 +74,14 @@
 (extend-type c/TaggedSymbol
   FileLoc
   (location [s]
-    (.loc s))
-
-  Tagged
-  (namespace [s]
-    (.ns s))
-  (tag [s] s)
-  (tag [s new-loc]
-    (.loc s new-loc)))
+    (.loc s)))
 
 (def no-loc (c/Location "" 0))
-
-(extend-type String
-  Tagged
-  (tag [s]
-    (c/tag s))
-  (tag [s loc]
-    (.loc (c/tag s) loc)))
 
 (extend-type Symbol
   FileLoc
   (location [_]
-    c/no-loc)
-
-  Tagged
-  (namespace [s]
-    s)
-  (tag [s]
-    (c/tag s))
-  (tag [s loc]
-    (.loc (c/tag s) loc)))
+    c/no-loc))
 
 (extend-type HashMap
   FileLoc
@@ -140,7 +99,7 @@
                               (maybe loc)))))
             no-loc)))
 
-(def result-sym (tag "#result"))
+(def result-sym (c/tag "#result"))
 
 (deftype inline-ast [lang constraint txt loc]
   (assert (instance? c/TaggedSymbol lang))
@@ -192,13 +151,6 @@
 
   Collection
   (count [_] (count fixed))
-
-  Tagged
-  (tag [_ loc]
-    (params-ast (map fixed (fn [x]
-                             (tag x loc)))
-                (tag variadic loc)
-                c/top-type))
 
   FileLoc
   (location [_]
@@ -275,7 +227,7 @@
 
 (defn fn-arity
   ([params doc body]
-   (fn-arity (tag "") params doc body))
+   (fn-arity (c/tag "") params doc body))
   ([fn-sym params doc body]
    (fn-arity-ast fn-sym "" params doc body c/top-type)))
 
@@ -683,7 +635,7 @@
   (let [clauses (reverse clauses)]
     (reduce (rest clauses)
             (either (first clauses)
-                    (tag 'nothing))
+                    (c/tag 'nothing))
             (fn [cont clause]
               (and-ast clause cont c/maybe-constraint)))))
 
@@ -716,7 +668,7 @@
     (location clause)))
 
 (defn cond-val-expr [clause value]
-  (cond-ast clause value (tag '_) c/top-type))
+  (cond-ast clause value (c/tag '_) c/top-type))
 
 (defn cond-expr [clause-vals default]
   (reduce (reverse clause-vals)
@@ -752,7 +704,7 @@
   (let [clauses (reverse clauses)]
     (reduce (rest clauses)
             (either (first clauses)
-                    (tag 'nothing))
+                    (c/tag 'nothing))
             (fn [cont clause]
               (or-ast clause cont c/maybe-constraint)))))
 
