@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "42efdc1"))
+                          :sha "d0ce206"))
 
 (defprotocol FileLoc
   (location [ast]))
@@ -39,16 +39,12 @@
 
 ;; we tag symbols with file/line for use later
 (defprotocol Tagged
-  (namespace [s]
-    (assert-result r (instance? c/OptionalSym r)))
+  (namespace [s])
 
   (tag [s loc]
     (assert (instance? c/Location loc)))
 
-  (tag [s])
-
-  (untag [x]
-    (assert-result r (instance? c/OptionalSym r))))
+  (tag [s]))
 
 (extend-type c/fn-arity
   FileLoc
@@ -73,10 +69,7 @@
     s)
 
   (tag [s]
-    s)
-
-  (untag [x]
-    x))
+    s))
 
 (deftype Annotated [ast annots]
   Stringable
@@ -97,69 +90,26 @@
 (defn annotated [ast]
   (Annotated ast 'annotations))
 
-(deftype tagged-symbol [ns base sym loc constraint]
-  (assert (instance? c/Location loc))
-  (assert (instance? c/OptionalSym ns))
-  (assert (instance? Symbol sym))
-  (assert (instance? Symbol base))
-
-  Container
-  (map [x f]
-    x)
-
-  (map [x f embed]
-    (embed x))
-
-  Hashable
-  (sha1 [x] (sha1 base))
-
-  Ord
-  (<* [_ x] (<* x base))
-
-  Eq
-  (=* [_ x] (=* x base))
-
-  Stringable
-  (string-list [s]
-    ;; (list "(ast/tagged-symbol " (str ns " " base " " sym " " file " " line "\n" constraint) ")")
-    (list (either (map (instance? Symbol (.ns s))
-                       (fn [ns-str]
-                         (str ns-str "/" (untag (.base s)))))
-                  (str (untag (.base s))))))
-
+(extend-type c/TaggedSymbol
   FileLoc
-  (location [_]
-    loc)
+  (location [s]
+    (.loc s))
 
   Tagged
   (namespace [s]
     (.ns s))
   (tag [s] s)
   (tag [s new-loc]
-    (tagged-symbol (.ns s) (.base s) (.sym s) new-loc c/top-type))
-  (untag [s] (.base s))
-
-  c/Constraint
-  (c/show-full [x]
-    (list (str x))))
-
-(def TaggedSymbol (any-of Symbol
-                          tagged-symbol))
-
-(def OptionalTagged (any-of ;; Symbol
-                            c/NoSymbol
-                            tagged-symbol))
+    (.loc s new-loc)))
 
 (def no-loc (c/Location "" 0))
 
 (extend-type String
   Tagged
   (tag [s]
-    (let [s (symbol s)]
-      (tagged-symbol c/no-symbol s s no-loc c/top-type)))
+    (c/tag s))
   (tag [s loc]
-    (let [s (symbol s)]
-      (tagged-symbol c/no-symbol s s loc c/top-type))))
+    (.loc (c/tag s) loc)))
 
 (extend-type Symbol
   FileLoc
@@ -170,10 +120,9 @@
   (namespace [s]
     s)
   (tag [s]
-    (tagged-symbol c/no-symbol s s no-loc c/top-type))
+    (c/tag s))
   (tag [s loc]
-    (tagged-symbol c/no-symbol s s loc c/top-type))
-  (untag [s] s))
+    (.loc (c/tag s) loc)))
 
 (extend-type HashMap
   FileLoc
@@ -194,7 +143,7 @@
 (def result-sym (tag "#result"))
 
 (deftype inline-ast [lang constraint txt loc]
-  (assert (instance? tagged-symbol lang))
+  (assert (instance? c/TaggedSymbol lang))
   (assert (instance? c/ValueConstraint constraint))
   (assert (instance? String txt))
   (assert (instance? c/Location loc))
@@ -217,6 +166,7 @@
   (inline-ast lang txt constraint (c/Location path-to-file line-num)))
 
 (deftype params-ast [fixed variadic constraint]
+  (assert (instance? (vector-of (any-of c/TaggedSymbol params-ast)) fixed))
   ;; (assert (instance? (any-of params-ast c/NoSymbol) variadic))
 
   Stringable
@@ -255,17 +205,17 @@
     (either (map (first fixed) location)
             (location variadic))))
 
-(def ParamType (any-of tagged-symbol
+(def ParamType (any-of c/TaggedSymbol
                        params-ast))
 
 (defn params
   ([fixed] (params-ast fixed c/no-symbol c/top-type))
   ([fixed variadic]
-   (assert (instance? OptionalTagged variadic))
+   (assert (instance? c/OptionalSym variadic))
    (params-ast fixed variadic c/top-type)))
 
 (deftype definition-ast [sym value-exprs]
-  (assert (instance? tagged-symbol sym))
+  (assert (instance? c/TaggedSymbol sym))
 
   Stringable
   (string-list [_]
@@ -288,7 +238,7 @@
   (definition-ast sym value))
 
 (deftype fn-arity-ast [fn-sym fn-var params doc body constraint]
-  (assert (instance? OptionalTagged fn-sym))
+  (assert (instance? c/OptionalSym fn-sym))
   (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
 
   Stringable
@@ -330,7 +280,7 @@
    (fn-arity-ast fn-sym "" params doc body c/top-type)))
 
 (deftype fn-ast [fn-sym arities constraint]
-  (assert (instance? OptionalTagged fn-sym))
+  (assert (instance? c/OptionalSym fn-sym))
   (assert (instance? Vector arities))
 
   Type
@@ -339,7 +289,7 @@
 
   Stringable
   (string-list [_]
-    (comp (list "(fn " (str (either (map (instance? tagged-symbol fn-sym)
+    (comp (list "(fn " (str (either (map (instance? c/TaggedSymbol fn-sym)
                                          (fn [s] (str s " ")))
                                     "")))
           (cond (= 1 (count arities))
@@ -546,7 +496,7 @@
     nothing))
 
 (deftype declaration-ast [sym]
-  (assert (instance? tagged-symbol sym))
+  (assert (instance? c/TaggedSymbol sym))
 
   Stringable
   (string-list [_] (list "<DeclareAST " (str sym) ">"))
@@ -565,7 +515,7 @@
   (declaration-ast sym))
 
 (deftype prototype-ast [fn-name params doc default-body constraint]
-  (assert (instance? tagged-symbol fn-name))
+  (assert (instance? c/TaggedSymbol fn-name))
   (assert (instance? params-ast params))
   (assert (instance? block-comment-ast doc))
   (assert (instance? Vector default-body))
@@ -598,7 +548,7 @@
   (prototype-ast fn-name args doc default-body c/top-type))
 
 (deftype protocol-ast [protocol-sym prototypes]
-  (assert (instance? tagged-symbol protocol-sym))
+  (assert (instance? c/TaggedSymbol protocol-sym))
   (assert (instance? Vector prototypes))
 
   Stringable
@@ -621,7 +571,7 @@
   (protocol-ast sym prototypes))
 
 (deftype extend-ast [type impls]
-  (assert (instance? tagged-symbol type))
+  (assert (instance? c/TaggedSymbol type))
   (assert (instance? HashMap impls))
 
   Stringable
@@ -844,7 +794,7 @@
       (GetImpl new-impl type-sym new-c))))
 
 (deftype type-ast [sym fields impls]
-  (assert (instance? tagged-symbol sym))
+  (assert (instance? c/TaggedSymbol sym))
   (assert (instance? (any-of c/NoFields params-ast) fields))
   (assert (instance? Vector impls))
 
