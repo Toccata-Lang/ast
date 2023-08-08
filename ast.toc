@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "e5d543a"))
+                          :sha "2927849"))
 
 (defprotocol FileLoc
   (location [ast]))
