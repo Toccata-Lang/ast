@@ -3,10 +3,11 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "1827d32"))
+                          :sha "02ee23c"))
 
 (defprotocol FileLoc
-  (location [ast]))
+  (location [ast]
+    c/no-loc))
 
 (extend-type c/NoValues
   FileLoc
@@ -18,16 +19,6 @@
   (location [c]
     (either (last (.path c))
             c/no-loc)))
-
-(extend-type c/Contents
-  FileLoc
-  (location [c]
-    c/no-loc))
-
-(extend-type c/Field
-  FileLoc
-  (location [c]
-    c/no-loc))
 
 (extend-type Vector
   FileLoc
@@ -599,7 +590,7 @@
       (binding-ast new-binding new-val new-cont constraint)))
 
   FileLoc
-  (location [_] (location val)))
+  (location [_] (location binding)))
 
 (defn binding [binding val]
   (binding-ast binding val [] c/top-type))
