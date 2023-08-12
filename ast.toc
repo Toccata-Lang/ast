@@ -571,6 +571,30 @@
 (defn either-expr [clause alt]
   (either-ast clause alt c/top-type))
 
+(deftype do-ast [body constraint]
+  (assert (instance? Vector body))
+
+  Stringable
+  (string-list [_]
+    (list "(do-ast ["
+          (to-str (flat-map (interpose body "\n") string-list))
+          "])"))
+
+  Container
+  (map [x f]
+    (-> x
+        (.body (map body f))))
+
+  (map [x f embed]
+    (for [new-body (map body f embed)]
+      (.body x new-body)))
+
+  FileLoc
+  (location [_] (location body)))
+
+(defn do-expr [body]
+  (do-ast body c/top-type))
+
 (deftype binding-ast [binding val cont constraint]
   (assert (instance? Vector cont))
 
@@ -668,7 +692,9 @@
   (reduce (reverse clause-vals)
           default
           (fn [cont clause-val]
-            (.cont clause-val cont))))
+            (cond (instance? binding-ast clause-val)
+                  (.cont clause-val [cont])
+                  (.cont clause-val cont)))))
 
 (deftype or-ast [clause cont constraint]
   Stringable
