@@ -223,13 +223,13 @@
   ([fn-sym params doc body]
    (fn-arity-ast fn-sym "" params doc body c/top-type)))
 
-(deftype fn-ast [fn-sym arities constraint]
+(deftype fn-ast [fn-sym arities var constraint]
   (assert (instance? c/OptionalSym fn-sym))
   (assert (instance? Vector arities))
 
   Type
   (type-name [x]
-    (str "fn-ast: " fn-sym "\n" constraint))
+    (str "fn-ast: " fn-sym (str " \"" var "\"") "\n" constraint))
 
   Stringable
   (string-list [_]
@@ -248,11 +248,10 @@
 
   Container
   (map [x f]
-    (fn-ast fn-sym (map arities f) constraint))
+    (fn-ast fn-sym (map arities f) var constraint))
 
   (map [x f embed]
-    (for [new-arities (map arities f embed)
-          ]
+    (for [new-arities (map arities f embed)]
       (-> x
           (.arities new-arities))))
 
@@ -262,7 +261,7 @@
             (location fn-sym))))
 
 (defn fn-expr [sym arities]
-  (fn-ast sym arities c/top-type))
+  (fn-ast sym arities "" c/top-type))
 
 (deftype integer-ast [int loc constraint]
   (assert (instance? Integer int))
@@ -298,6 +297,7 @@
   FileLoc
   (location [_] loc))
 
+;; TODO: remove 'constraint' and see what breaks
 (deftype block-comment-ast [lines loc constraint]
   (assert (instance? (vector-of String) lines))
   (assert (instance? c/Location loc))
