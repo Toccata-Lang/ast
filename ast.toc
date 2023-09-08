@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "45e2277"))
+                          :sha "dcba6be"))
 
 (defprotocol FileLoc
   (location [ast]
@@ -116,8 +116,12 @@
   (inline-ast lang txt constraint (c/Location path-to-file line-num)))
 
 (deftype params-ast [fixed variadic constraint]
-  (assert (instance? (vector-of (any-of c/TaggedSymbol params-ast)) fixed))
-  ;; (assert (instance? (any-of params-ast c/NoSymbol) variadic))
+  (assert (instance? (vector-of (any-of c/TaggedSymbol
+                                        params-ast))
+                     fixed))
+  ;; (assert (instance? (any-of params-ast
+  ;;                            c/OptionalSym)
+  ;;                    variadic))
 
   Stringable
   (string-list [_]
