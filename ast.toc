@@ -827,6 +827,9 @@
 (defn main-fn [params body]
   (definition (c/tag main (location params))
     [(fn-expr (c/tag main (location params))
-              [(fn-arity params
-                         (block-comment-ast [] c/no-loc c/top-type)
-                         body)])]))
+              [(.constraint (fn-arity params
+                                      (block-comment-ast [] c/no-loc c/top-type)
+                                      body)
+                            (c/fn-arity main
+                                        (c/list-c [(c/vect-c [c/string-constraint])])
+                                        c/top-type))])]))
