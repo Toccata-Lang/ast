@@ -92,7 +92,7 @@
 
 (def result-sym (c/tag "#result"))
 
-(deftype inline-ast [lang constraint txt loc]
+(deftype inline-ast [lang constraint txt loc var]
   (assert (instance? c/TaggedSymbol lang))
   (assert (instance? c/ValueConstraint constraint))
   (assert (instance? String txt))
@@ -113,7 +113,7 @@
   (location [_] loc))
 
 (defn inline [lang txt constraint path-to-file line-num]
-  (inline-ast lang txt constraint (c/Location path-to-file line-num)))
+  (inline-ast lang txt constraint (c/Location path-to-file line-num) ""))
 
 (deftype params-ast [fixed variadic constraint]
   (assert (instance? (vector-of (any-of c/TaggedSymbol
@@ -267,9 +267,11 @@
 (defn fn-expr [sym arities]
   (fn-ast sym arities "" c/top-type))
 
-(deftype integer-ast [int loc constraint]
+(deftype integer-ast [int loc var constraint]
   (assert (instance? Integer int))
   (assert (instance? c/Location loc))
+  (assert (instance? String var))
+  (assert (instance? c/IntegerConstraint constraint))
 
   Stringable
   (string-list [_] (list (str int)))
