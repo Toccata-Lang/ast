@@ -358,7 +358,7 @@
 (defn reified [type-num impls]
   (reify-ast type-num impls c/top-type))
 
-(deftype call-ast [call-target args constraint]
+(deftype call-ast [call-target args var constraint]
   (assert (instance? Vector args))
 
   Stringable
@@ -369,12 +369,12 @@
 
   Container
   (map [x f]
-    (call-ast (f call-target) (map args f) constraint))
+    (call-ast (f call-target) (map args f) var constraint))
 
   (map [x f embed]
     (for [new-target (f call-target)
           new-args (map args f embed)]
-      (call-ast new-target new-args constraint)))
+      (call-ast new-target new-args var constraint)))
 
   FileLoc
   (location [_]
@@ -383,7 +383,7 @@
           (location call-target))))
 
 (defn call-expr [[target & args]]
-  (call-ast target (vec args) c/top-type))
+  (call-ast target (vec args) "" c/top-type))
 
 (deftype quoted-ast [q-val constraint]
   Stringable
