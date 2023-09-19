@@ -286,8 +286,9 @@
   FileLoc
   (location [_] loc))
 
-(deftype string-ast [string loc constraint]
+(deftype string-ast [string loc var constraint]
   (assert (instance? String string))
+  (assert (instance? String var))
   (assert (instance? c/Location loc))
 
   Stringable
