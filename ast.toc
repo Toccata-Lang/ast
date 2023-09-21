@@ -115,7 +115,7 @@
 (defn inline [lang txt constraint path-to-file line-num]
   (inline-ast lang txt constraint (c/Location path-to-file line-num) ""))
 
-(deftype params-ast [fixed variadic constraint]
+(deftype params-ast [fixed variadic var constraint]
   (assert (instance? (vector-of (any-of c/TaggedSymbol
                                         params-ast))
                      fixed))
@@ -137,12 +137,12 @@
 
   Container
   (map [x f]
-    (params-ast (map fixed f) (f variadic) constraint))
+    (params-ast (map fixed f) (f variadic) var constraint))
 
   (map [x f embed]
     (for [new-fixed (map fixed f embed)
           new-var (f variadic)]
-      (params-ast new-fixed new-var constraint)))
+      (params-ast new-fixed new-var var constraint)))
 
   Collection
   (count [_] (count fixed))
@@ -156,10 +156,10 @@
                        params-ast))
 
 (defn params
-  ([fixed] (params-ast fixed c/no-symbol c/top-type))
+  ([fixed] (params-ast fixed c/no-symbol "" c/top-type))
   ([fixed variadic]
    (assert (instance? c/OptionalSym variadic))
-   (params-ast fixed variadic c/top-type)))
+   (params-ast fixed variadic "" c/top-type)))
 
 (deftype definition-ast [sym value-exprs]
   (assert (instance? c/TaggedSymbol sym))
