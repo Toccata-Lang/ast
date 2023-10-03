@@ -836,3 +836,22 @@
                             (c/fn-arity main
                                         (c/list-c [(c/vect-c [c/string-constraint])])
                                         c/top-type))])]))
+
+(def AST (any-of params-ast
+                 definition-ast
+                 binding-ast
+                 fn-arity-ast
+                 fn-ast
+                 integer-ast
+                 string-ast
+                 reify-ast
+                 call-ast
+                 quoted-ast
+                 prototype-ast
+                 protocol-ast
+                 do-ast
+                 and-ast
+                 cond-ast
+                 or-ast
+                 inline-ast
+                 ))
