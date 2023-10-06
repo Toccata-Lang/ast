@@ -233,7 +233,8 @@
 
   Type
   (type-name [x]
-    (str "fn-ast: " fn-sym (str " \"" var "\"") "\n" constraint))
+    (str "fn-ast: " fn-sym (str " \"" var "\"") ;; "\n" constraint
+         ))
 
   Stringable
   (string-list [_]
@@ -603,7 +604,8 @@
 (defn do-expr [body]
   (do-ast body c/top-type))
 
-(deftype binding-ast [binding val cont constraint]
+(deftype binding-ast [binding val cont var constraint]
+  (assert (instance? String var))
   (assert (instance? Vector cont))
 
   Stringable
@@ -613,19 +615,19 @@
 
   Container
   (map [x f]
-    (binding-ast (f binding) (f val) (map cont f) constraint))
+    (binding-ast (f binding) (f val) (map cont f) var constraint))
 
   (map [x f embed]
     (for [new-val (f val)
           new-binding (f binding)
           new-cont (map cont f embed)]
-      (binding-ast new-binding new-val new-cont constraint)))
+      (binding-ast new-binding new-val new-cont var constraint)))
 
   FileLoc
   (location [_] (location binding)))
 
 (defn binding [binding val]
-  (binding-ast binding val [] c/top-type))
+  (binding-ast binding val [] "" c/top-type))
 
 (defn let-expr [bindings body]
   (-> (reverse bindings)
