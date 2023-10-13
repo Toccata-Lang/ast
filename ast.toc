@@ -466,11 +466,13 @@
 (defn declare [sym]
   (declaration-ast sym))
 
-(deftype prototype-ast [fn-name params doc default-body constraint]
+(deftype prototype-ast [fn-name params doc default-body impls var constraint]
   (assert (instance? c/TaggedSymbol fn-name))
   (assert (instance? params-ast params))
   (assert (instance? block-comment-ast doc))
   (assert (instance? Vector default-body))
+  (assert (instance? HashMap impls))
+  (assert (instance? String var))
   (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
 
   Stringable
@@ -497,7 +499,7 @@
   (location [_] (location fn-name)))
 
 (defn prototype [fn-name args doc default-body]
-  (prototype-ast fn-name args doc default-body c/top-type))
+  (prototype-ast fn-name args doc default-body {} "" c/top-type))
 
 (deftype protocol-ast [protocol-sym prototypes]
   (assert (instance? c/TaggedSymbol protocol-sym))
