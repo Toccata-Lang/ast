@@ -473,7 +473,7 @@
   (assert (instance? Vector default-body))
   (assert (instance? HashMap impls))
   (assert (instance? String var))
-  (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
+  (assert (instance? (any-of c/AllValues c/ProtoImpls) constraint))
 
   Stringable
   (string-list [_] (comp (list "(" (str fn-name) " ")
