@@ -328,9 +328,10 @@
 (defn block-comment [path-to-file line-num lines]
   (block-comment-ast (vec lines) (c/Location path-to-file line-num) c/top-type))
 
-(deftype reify-ast [type-num impls constraint]
+(deftype reify-ast [type-num impls var constraint]
   (assert (instance? c/OptionalInt type-num))
   (assert (instance? HashMap impls))
+  (assert (instance? String var))
 
   Stringable
   (string-list [_] (list "(reify " (str type-num " \n" impls) ")"))
@@ -357,7 +358,7 @@
   (location [_] (location impls)))
 
 (defn reified [type-num impls]
-  (reify-ast type-num impls c/top-type))
+  (reify-ast type-num impls "" c/top-type))
 
 (deftype call-ast [call-target args var constraint]
   (assert (instance? Vector args))
@@ -386,7 +387,7 @@
 (defn call-expr [[target & args]]
   (call-ast target (vec args) "" c/top-type))
 
-(deftype quoted-ast [q-val constraint]
+(deftype quoted-ast [q-val var constraint]
   Stringable
   (string-list [_]
     (list (str "'" q-val)))
@@ -399,17 +400,17 @@
 
   Container
   (map [x f]
-    (quoted-ast (f q-val) constraint))
+    (quoted-ast (f q-val) var constraint))
 
   (map [x f embed]
     (for [new-v (f q-val)]
-      (quoted-ast new-v constraint)))
+      (quoted-ast new-v var constraint)))
 
   FileLoc
   (location [_] (location q-val)))
 
 (defn quoted [q-val]
-  (quoted-ast q-val c/top-type))
+  (quoted-ast q-val "" c/top-type))
 
 (defprotocol IsCode
   (generates-code? [x]))
@@ -556,7 +557,9 @@
                            (apply comp (seq (filter impls (partial instance? HashMap)))))))
 
 ;; TODO: make threading into either, and, or possible
-(deftype either-ast [clause alt constraint]
+(deftype either-ast [clause alt var constraint]
+  (assert (instance? String var))
+  
   Stringable
   (string-list [_]
     (comp (list "(either ")
@@ -569,18 +572,19 @@
   (map [x f]
     (either-ast (f clause)
                 (f alt)
+                var
                 constraint))
 
   (map [x f embed]
     (for [new-clause (f clause)
           new-alt (f alt)]
-      (either-ast new-clause new-alt constraint)))
+      (either-ast new-clause new-alt var constraint)))
 
   FileLoc
   (location [_] (location clause)))
 
 (defn either-expr [clause alt]
-  (either-ast clause alt c/top-type))
+  (either-ast clause alt "" c/top-type))
 
 (deftype do-ast [body constraint]
   (assert (instance? Vector body))
@@ -637,7 +641,9 @@
                      (.cont binding (either (instance? Vector cont)
                                             [cont]))))))
 
-(deftype and-ast [clause cont constraint]
+(deftype and-ast [clause cont var constraint]
+  (assert (instance? String var))
+  
   Stringable
   (string-list [_]
     (comp (list "(and " (str clause) "\n")
@@ -667,9 +673,11 @@
             (either (first clauses)
                     (c/tag 'nothing))
             (fn [cont clause]
-              (and-ast clause cont c/maybe-constraint)))))
+              (and-ast clause cont "" c/maybe-constraint)))))
 
-(deftype cond-ast [clause value cont constraint]
+(deftype cond-ast [clause value cont var constraint]
+  (assert (instance? String var))
+
   Stringable
   (string-list [_]
     (list "(cond " (str clause) "\n"
@@ -698,7 +706,7 @@
     (location clause)))
 
 (defn cond-val-expr [clause value]
-  (cond-ast clause value (c/tag '_) c/top-type))
+  (cond-ast clause value (c/tag '_) "" c/top-type))
 
 (defn cond-expr [clause-vals default]
   (reduce (reverse clause-vals)
@@ -708,7 +716,9 @@
                   (.cont clause-val [cont])
                   (.cont clause-val cont)))))
 
-(deftype or-ast [clause cont constraint]
+(deftype or-ast [clause cont var constraint]
+  (assert (instance? String var))
+  
   Stringable
   (string-list [_]
     (comp (list "(or " (str clause) "\n")
@@ -738,7 +748,7 @@
             (either (first clauses)
                     (c/tag 'nothing))
             (fn [cont clause]
-              (or-ast clause cont c/maybe-constraint)))))
+              (or-ast clause cont "" c/maybe-constraint)))))
 
 
 
