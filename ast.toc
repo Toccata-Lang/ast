@@ -62,11 +62,6 @@
 (defn annotated [ast]
   (Annotated ast 'annotations))
 
-(extend-type c/TaggedSymbol
-  FileLoc
-  (location [s]
-    (.loc s)))
-
 (def no-loc (c/Location "" 0))
 
 (extend-type Symbol
@@ -114,6 +109,23 @@
 (defn inline [txt constraint path-to-file line-num]
   (inline-ast txt constraint (c/Location path-to-file line-num) ""))
 
+(defprotocol ParamsProto
+  (all-symbols [ast]
+    (assert-result l (instance? Vector l))
+
+    ;; how to use
+    ;; (cata all-symbols (.fields ast))
+    []))
+
+(extend-type c/TaggedSymbol
+  FileLoc
+  (location [s]
+    (.loc s))
+
+  ParamsProto
+  (all-symbols [ast]
+    [ast]))
+
 (deftype params-ast [fixed variadic var constraint]
   (assert (instance? (vector-of (any-of c/TaggedSymbol
                                         params-ast))
@@ -146,6 +158,11 @@
   Collection
   (count [_] (count fixed))
 
+  ParamsProto
+  (all-symbols [params]
+    (comp* (.variadic params)
+           (seq (.fixed params))))
+
   FileLoc
   (location [_]
     (either (map (first fixed) location)
@@ -159,6 +176,11 @@
   ([fixed variadic]
    (assert (instance? c/OptionalSym variadic))
    (params-ast fixed variadic "" c/top-type)))
+
+(defn all-syms [params]
+  (assert (instance? ParamType params))
+
+  (cata all-symbols params))
 
 (deftype definition-ast [sym value-exprs]
   (assert (instance? c/TaggedSymbol sym))
@@ -185,6 +207,7 @@
   (definition-ast sym value))
 
 (deftype fn-arity-ast [fn-sym fn-var params doc body constraint]
+  ;; body min count 1
   (assert (instance? c/OptionalSym fn-sym))
   (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
 
@@ -586,6 +609,7 @@
   (either-ast clause alt "" c/top-type))
 
 (deftype do-ast [body constraint]
+  ;; body min count 1
   (assert (instance? Vector body))
 
   Stringable
@@ -610,6 +634,7 @@
   (do-ast body c/top-type))
 
 (deftype binding-ast [binding val cont var constraint]
+  ;; cont min count 1
   (assert (instance? String var))
   (assert (instance? Vector cont))
 
