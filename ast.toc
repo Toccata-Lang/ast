@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "dcba6be"))
+                          :sha "7df6fc3"))
 
 (defprotocol FileLoc
   (location [ast]
@@ -206,7 +206,7 @@
 (defn definition [sym value]
   (definition-ast sym value))
 
-(deftype fn-arity-ast [fn-sym fn-var params doc body constraint]
+(deftype fn-arity-ast [fn-sym arity-id params doc body var constraint]
   ;; body min count 1
   (assert (instance? c/OptionalSym fn-sym))
   (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
@@ -247,9 +247,9 @@
   ([params doc body]
    (fn-arity (c/tag "") params doc body))
   ([fn-sym params doc body]
-   (fn-arity-ast fn-sym "" params doc body c/top-type)))
+   (fn-arity-ast fn-sym c/no-symbol params doc body "" c/top-type)))
 
-(deftype fn-ast [fn-sym arities var constraint]
+(deftype fn-ast [fn-sym arities var struct-var constraint]
   (assert (instance? c/OptionalSym fn-sym))
   (assert (instance? Vector arities))
 
@@ -275,7 +275,7 @@
 
   Container
   (map [x f]
-    (fn-ast fn-sym (map arities f) var constraint))
+    (fn-ast fn-sym (map arities f) var struct-var constraint))
 
   (map [x f embed]
     (for [new-arities (map arities f embed)]
@@ -288,7 +288,7 @@
             (location fn-sym))))
 
 (defn fn-expr [sym arities]
-  (fn-ast sym arities "" c/top-type))
+  (fn-ast sym arities "" "" c/top-type))
 
 (deftype integer-ast [int loc var constraint]
   (assert (instance? Integer int))
