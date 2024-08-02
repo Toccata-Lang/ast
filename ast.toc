@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "91611e8"))
+                          :sha "a4c915d"))
 
 (defprotocol FileLoc
   (location [ast]
@@ -248,47 +248,6 @@
    (fn-arity (c/tag "") params doc body))
   ([fn-sym params doc body]
    (fn-arity-ast fn-sym c/no-symbol params doc body "" c/top-type)))
-
-(deftype fn-ast [fn-sym arities var struct-var constraint]
-  (assert (instance? c/OptionalSym fn-sym))
-  (assert (instance? Vector arities))
-
-  Type
-  (type-name [x]
-    (str "fn-ast: " fn-sym (str " \"" var "\"") ;; "\n" constraint
-         ))
-
-  Stringable
-  (string-list [_]
-    (comp (list "(fn " (str (either (map (instance? c/TaggedSymbol fn-sym)
-                                         (fn [s] (str s " ")))
-                                    "")))
-          (cond (= 1 (count arities))
-                (flat-map (seq arities) string-list)
-                (-> (seq arities)
-                    (interpose "\n")
-                    (flat-map (fn [arity]
-                                (comp (list "(")
-                                      (string-list arity)
-                                      (list ")"))))))
-          (list  ")")))
-
-  Container
-  (map [x f]
-    (fn-ast fn-sym (map arities f) var struct-var constraint))
-
-  (map [x f embed]
-    (for [new-arities (map arities f embed)]
-      (-> x
-          (.arities new-arities))))
-
-  FileLoc
-  (location [_]
-    (either (map (first arities) location)
-            (location fn-sym))))
-
-(defn fn-expr [sym arities]
-  (fn-ast sym arities "" "" c/top-type))
 
 (deftype integer-ast [int loc var constraint]
   (assert (instance? Integer int))
@@ -834,19 +793,17 @@
 
 (defn main-fn [params body]
   (definition (c/tag main (location params))
-    [(fn-expr (c/tag main (location params))
-              [(.constraint (fn-arity params
-                                      (block-comment-ast [] c/no-loc c/top-type)
-                                      body)
-                            (c/arity main
-                                        (c/list-c [(c/vect-c [c/string-constraint])])
-                                        c/top-type))])]))
+    [(.constraint (fn-arity params
+                            (block-comment-ast [] c/no-loc c/top-type)
+                            body)
+                  (c/arity main
+                           (c/list-c [(c/vect-c [c/string-constraint])])
+                           c/top-type))]))
 
 (def AST (any-of params-ast
                  definition-ast
                  binding-ast
                  fn-arity-ast
-                 fn-ast
                  integer-ast
                  string-ast
                  reify-ast
