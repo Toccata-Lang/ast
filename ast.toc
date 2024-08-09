@@ -213,10 +213,11 @@
 
   Stringable
   (string-list [_]
-    (comp (list (str fn-sym) " ")
+    (comp (list "(fn " (str fn-sym) " ")
           (string-list params)
           (list "\n")
-          (flat-map (interpose body "\n") string-list)))
+          (flat-map (interpose body "\n") string-list)
+          (list ")\n")))
 
   ;; (string-list [_]
   ;;   (list "(ast/fn-arity-ast "
@@ -241,13 +242,24 @@
           (.body new-body))))
 
   FileLoc
-  (location [_] (location fn-sym)))
+  (location [_]
+    (cond (instance? c/TaggedSymbol fn-sym)
+          (location fn-sym)
+
+          (either (or (map (first (.fixed params))
+                           location)
+                      (map (first body)
+                           location))
+                  (location fn-sym)))))
 
 (defn fn-arity
   ([params doc body]
-   (fn-arity (c/tag "") params doc body))
+   (fn-arity (c/tag "") params doc (either (instance? Vector body)
+                                           [body])))
   ([fn-sym params doc body]
-   (fn-arity-ast fn-sym c/no-symbol params doc body "" c/top-type)))
+   (fn-arity-ast fn-sym c/no-symbol params doc (either (instance? Vector body)
+                                                       [body])
+                 "" c/top-type)))
 
 (deftype integer-ast [int loc var constraint]
   (assert (instance? Integer int))
@@ -520,7 +532,7 @@
 ;; TODO: make threading into either, and, or possible
 (deftype either-ast [clause alt var constraint]
   (assert (instance? String var))
-  
+
   Stringable
   (string-list [_]
     (comp (list "(either ")
@@ -596,17 +608,19 @@
   (location [_] (location binding)))
 
 (defn binding [binding val]
-  (binding-ast binding val [] "" c/top-type))
+  (binding-ast (params [binding]) val [] "" c/top-type))
 
 (defn let-expr [bindings body]
   (-> (reverse bindings)
       (reduce body (fn [cont binding]
-                     (.cont binding (either (instance? Vector cont)
-                                            [cont]))))))
+                     (call-expr [(fn-arity (.binding binding)
+                                           (block-comment-ast [] c/no-loc c/top-type)
+                                           cont)
+                                 (.val binding)])))))
 
 (deftype and-ast [clause cont var constraint]
   (assert (instance? String var))
-  
+
   Stringable
   (string-list [_]
     (comp (list "(and " (str clause) "\n")
@@ -681,7 +695,7 @@
 
 (deftype or-ast [clause cont var constraint]
   (assert (instance? String var))
-  
+
   Stringable
   (string-list [_]
     (comp (list "(or " (str clause) "\n")
