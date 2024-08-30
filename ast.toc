@@ -364,8 +364,12 @@
 
   FileLoc
   (location [_]
-    (cond (first args)
+    (cond (instance? c/TaggedSymbol call-target)
+          (location call-target)
+
+          (first args)
           (location args)
+
           (location call-target))))
 
 (defn call-expr [[target & args]]
@@ -486,29 +490,6 @@
 (defn prototype [fn-name args doc default-body]
   (prototype-ast fn-name args doc default-body {} "" c/top-type))
 
-(deftype protocol-ast [protocol-sym prototypes]
-  (assert (instance? c/TaggedSymbol protocol-sym))
-  (assert (instance? Vector prototypes))
-
-  Stringable
-  (string-list [_] (list "(defprotocol " (str protocol-sym) "\n"
-                         (to-str (interpose prototypes "\n"))
-                         ")"))
-
-  Container
-  (map [x f]
-    (.prototypes x (map prototypes f)))
-
-  (map [x f embed]
-    (map (map prototypes f embed)
-         (partial .prototypes x)))
-
-  FileLoc
-  (location [_] (location protocol-sym)))
-
-(defn protocol [sym prototypes]
-  (protocol-ast sym prototypes))
-
 (deftype extend-ast [type impls]
   (assert (instance? c/TaggedSymbol type))
   (assert (instance? Vector impls))
@@ -559,30 +540,10 @@
 (defn either-expr [clause alt]
   (either-ast clause alt "" c/top-type))
 
-(deftype do-ast [body constraint]
-  ;; body min count 1
-  (assert (instance? Vector body))
-
-  Stringable
-  (string-list [_]
-    (list "(do-ast ["
-          (to-str (flat-map (interpose body "\n") string-list))
-          "])"))
-
-  Container
-  (map [x f]
-    (-> x
-        (.body (map body f))))
-
-  (map [x f embed]
-    (for [new-body (map body f embed)]
-      (.body x new-body)))
-
-  FileLoc
-  (location [_] (location body)))
-
 (defn do-expr [body]
-  (do-ast body c/top-type))
+  (call-expr [(fn-arity (params-ast [] c/no-symbol "" c/top-type)
+                        (block-comment-ast [] c/no-loc c/top-type)
+                        body)]))
 
 (deftype binding-ast [binding val cont var constraint]
   ;; cont min count 1
@@ -824,8 +785,6 @@
                  call-ast
                  quoted-ast
                  prototype-ast
-                 protocol-ast
-                 do-ast
                  and-ast
                  cond-ast
                  or-ast
