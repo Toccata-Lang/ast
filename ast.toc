@@ -579,39 +579,21 @@
                                            cont)
                                  (.val binding)])))))
 
-(deftype and-ast [clause cont var constraint]
-  (assert (instance? String var))
-
-  Stringable
-  (string-list [_]
-    (comp (list "(and " (str clause) "\n")
-          (string-list cont)
-          (list ")")))
-
-  Container
-  (map [x f]
-    (-> x
-        (.clause (f clause))
-        (.cont (f cont))))
-
-  (map [x f embed]
-    (for [new-clause (f clause)
-          new-cont (f cont)]
-      (-> x
-          (.clause new-clause)
-          (.cont new-cont))))
-
-  FileLoc
-  (location [_]
-    (location clause)))
-
 (defn and-expr [clauses]
   (let [clauses (reverse clauses)]
     (reduce (rest clauses)
             (either (first clauses)
                     (c/tag 'nothing))
             (fn [cont clause]
-              (and-ast clause cont "" c/maybe-constraint)))))
+              (call-expr [(c/tag "and" (location clause)) cont])))))
+
+(defn or-expr [clauses]
+  (let [clauses (reverse clauses)]
+    (reduce (rest clauses)
+            (either (first clauses)
+                    (c/tag 'nothing))
+            (fn [cont clause]
+              (call-expr [(c/tag "or" (location clause)) cont])))))
 
 (deftype cond-ast [clause value cont var constraint]
   (assert (instance? String var))
@@ -653,42 +635,6 @@
             (cond (instance? binding-ast clause-val)
                   (.cont clause-val [cont])
                   (.cont clause-val cont)))))
-
-(deftype or-ast [clause cont var constraint]
-  (assert (instance? String var))
-
-  Stringable
-  (string-list [_]
-    (comp (list "(or " (str clause) "\n")
-          (string-list cont)
-          (list ")")))
-
-  Container
-  (map [x f]
-    (-> x
-        (.clause (f clause))
-        (.cont (f cont))))
-
-  (map [x f embed]
-    (for [new-clause (f clause)
-          new-cont (f cont)]
-      (-> x
-          (.clause new-clause)
-          (.cont new-cont))))
-
-  FileLoc
-  (location [_]
-    (location clause)))
-
-(defn or-expr [clauses]
-  (let [clauses (reverse clauses)]
-    (reduce (rest clauses)
-            (either (first clauses)
-                    (c/tag 'nothing))
-            (fn [cont clause]
-              (or-ast clause cont "" c/maybe-constraint)))))
-
-
 
 (deftype IsType [ast expected]
   Stringable
@@ -785,8 +731,6 @@
                  call-ast
                  quoted-ast
                  prototype-ast
-                 and-ast
                  cond-ast
-                 or-ast
                  inline-ast
                  ))
