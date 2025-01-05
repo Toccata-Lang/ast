@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "f8bb466"))
+                          :sha "bb97351"))
 
 (defprotocol FileLoc
   (location [ast]
@@ -455,11 +455,10 @@
 (defn declare [sym]
   (declaration-ast sym))
 
-(deftype prototype-ast [fn-name params doc default-body impls var constraint]
+(deftype prototype-ast [fn-name params doc impls var constraint]
   (assert (instance? c/TaggedSymbol fn-name))
   (assert (instance? params-ast params))
   (assert (instance? block-comment-ast doc))
-  (assert (instance? Vector default-body))
   (assert (instance? HashMap impls))
   (assert (instance? String var))
   (assert (instance? (any-of c/AllValues c/ProtoImpls) constraint))
@@ -467,28 +466,33 @@
   Stringable
   (string-list [_] (comp (list "(" (str fn-name) " ")
                          (string-list params)
-                         (list "\n")
-                         (flat-map (interpose default-body "\n") string-list)
-                         ")"))
+                         (list ")")))
 
   Container
   (map [x f]
     (-> x
-        (.params (map params f))
-        (.default-body (map default-body f))))
+        (.impls (map-vals (.impls x) f))
+        (.params (map params f))))
 
   (map [x f embed]
     (for [new-params (map params f embed)
-          new-body (map default-body f embed)]
+          new-impls (contextual-map-vals (.impls x) f embed)]
       (-> x
-          (.params new-params)
-          (.default-body new-body))))
+          (.impls new-impls)
+          (.params new-params))))
 
   FileLoc
   (location [_] (location fn-name)))
 
 (defn prototype [fn-name args doc default-body]
-  (prototype-ast fn-name args doc default-body {} "" c/top-type))
+  (prototype-ast fn-name args doc
+                 (cond (empty? (remove default-body (fn [expr]
+                                                      (instance? c/Constraints expr))))
+                       {}
+                       {c/UnknownType (fn-arity fn-name args
+                                                (block-comment-ast [] c/no-loc c/top-type)
+                                                default-body)})
+                 "" c/top-type))
 
 (deftype extend-ast [type impls]
   (assert (instance? c/TaggedSymbol type))
@@ -585,7 +589,7 @@
             (either (first clauses)
                     (c/tag 'nothing))
             (fn [cont clause]
-              (call-expr [(c/tag "and" (location clause)) cont])))))
+              (call-expr [(c/tag "and" (location clause)) clause cont])))))
 
 (defn or-expr [clauses]
   (let [clauses (reverse clauses)]
@@ -593,7 +597,7 @@
             (either (first clauses)
                     (c/tag 'nothing))
             (fn [cont clause]
-              (call-expr [(c/tag "or" (location clause)) cont])))))
+              (call-expr [(c/tag "or" (location clause)) clause cont])))))
 
 (deftype cond-ast [clause value cont var constraint]
   (assert (instance? String var))
