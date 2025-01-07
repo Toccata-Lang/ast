@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "bb97351"))
+                          :sha "ff96b0c"))
 
 (defprotocol FileLoc
   (location [ast]
@@ -514,36 +514,6 @@
   FileLoc
   (location [_] (location type)))
 
-;; TODO: make threading into either, and, or possible
-(deftype either-ast [clause alt var constraint]
-  (assert (instance? String var))
-
-  Stringable
-  (string-list [_]
-    (comp (list "(either ")
-          (string-list clause)
-          (list "\n")
-          (string-list alt)
-          (list ")")))
-
-  Container
-  (map [x f]
-    (either-ast (f clause)
-                (f alt)
-                var
-                constraint))
-
-  (map [x f embed]
-    (for [new-clause (f clause)
-          new-alt (f alt)]
-      (either-ast new-clause new-alt var constraint)))
-
-  FileLoc
-  (location [_] (location clause)))
-
-(defn either-expr [clause alt]
-  (either-ast clause alt "" c/top-type))
-
 (defn do-expr [body]
   (call-expr [(fn-arity (params-ast [] c/no-symbol "" c/top-type)
                         (block-comment-ast [] c/no-loc c/top-type)
@@ -598,47 +568,6 @@
                     (c/tag 'nothing))
             (fn [cont clause]
               (call-expr [(c/tag "or" (location clause)) clause cont])))))
-
-(deftype cond-ast [clause value cont var constraint]
-  (assert (instance? String var))
-
-  Stringable
-  (string-list [_]
-    (list "(cond " (str clause) "\n"
-          (str value) "\n"
-          (str cont)
-          ")"))
-
-  Container
-  (map [x f]
-    (-> x
-        (.clause (f clause))
-        (.value (f value))
-        (.cont (f cont))))
-
-  (map [x f embed]
-    (for [new-clause (f clause)
-          new-value (f value)
-          new-cont (f cont)]
-      (-> x
-          (.clause new-clause)
-          (.value new-value)
-          (.cont new-cont))))
-
-  FileLoc
-  (location [_]
-    (location clause)))
-
-(defn cond-val-expr [clause value]
-  (cond-ast clause value (c/tag '_) "" c/top-type))
-
-(defn cond-expr [clause-vals default]
-  (reduce (reverse clause-vals)
-          default
-          (fn [cont clause-val]
-            (cond (instance? binding-ast clause-val)
-                  (.cont clause-val [cont])
-                  (.cont clause-val cont)))))
 
 (deftype IsType [ast expected]
   Stringable
@@ -735,6 +664,5 @@
                  call-ast
                  quoted-ast
                  prototype-ast
-                 cond-ast
                  inline-ast
                  ))
