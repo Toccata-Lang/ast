@@ -322,28 +322,6 @@
 (defn block-comment [path-to-file line-num lines]
   (block-comment-ast (vec lines) (c/Location path-to-file line-num) c/top-type))
 
-(deftype reify-ast [type-num impls var constraint]
-  (assert (instance? c/OptionalInt type-num))
-  (assert (instance? Vector impls))
-  (assert (instance? String var))
-
-  Stringable
-  (string-list [_] (list "(reify " (str type-num " \n" impls) ")"))
-
-  Container
-  (map [x f]
-    (.impls x (map impls f)))
-
-  (map [x f embed]
-    (for [new-impls (map impls f embed)]
-      (.impls x new-impls)))
-
-  FileLoc
-  (location [_] (location impls)))
-
-(defn reified [type-num impls]
-  (reify-ast type-num impls "" c/top-type))
-
 (deftype call-ast [call-target args var constraint]
   (assert (instance? Vector args))
 
@@ -374,31 +352,6 @@
 
 (defn call-expr [[target & args]]
   (call-ast target (vec args) "" c/top-type))
-
-(deftype quoted-ast [q-val var constraint]
-  Stringable
-  (string-list [_]
-    (list (str "'" q-val)))
-
-  Ord
-  (<* [x y]
-    (assert (instance? quoted-ast y))
-    (and (< q-val (.q-val x))
-         (maybe x)))
-
-  Container
-  (map [x f]
-    (quoted-ast (f q-val) var constraint))
-
-  (map [x f embed]
-    (for [new-v (f q-val)]
-      (quoted-ast new-v var constraint)))
-
-  FileLoc
-  (location [_] (location q-val)))
-
-(defn quoted [q-val]
-  (quoted-ast q-val "" c/top-type))
 
 (defprotocol IsCode
   (generates-code? [x]))
@@ -660,9 +613,7 @@
                  fn-arity-ast
                  integer-ast
                  string-ast
-                 reify-ast
                  call-ast
-                 quoted-ast
                  prototype-ast
                  inline-ast
                  ))
