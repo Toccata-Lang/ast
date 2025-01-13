@@ -596,7 +596,12 @@
   (location [_]
     (location sym)))
 
-(deftype field-ast [sym idx val-var var constraint]
+(deftype field-ast [sym idx type-num val-var var constraint]
+  Stringable
+  (string-list [_]
+    (list "(ast/field-ast "  (str sym " " idx " " type-num)
+          (str " '" val-var "'") (str " '" var "'") (str " " constraint) ")"))
+
   Container
   (map [x f]
     x)
