@@ -414,7 +414,7 @@
   (assert (instance? block-comment-ast doc))
   (assert (instance? HashMap impls))
   (assert (instance? String var))
-  (assert (instance? (any-of c/AllValues c/ProtoImpls) constraint))
+  (assert (instance? c/ProtoImpls constraint))
 
   Stringable
   (string-list [_] (comp (list "(" (str fn-name) " ")
@@ -445,7 +445,7 @@
                        {c/UnknownType (fn-arity fn-name args
                                                 (block-comment-ast [] c/no-loc c/top-type)
                                                 default-body)})
-                 "" c/top-type))
+                 "" (c/ProtoImpls fn-name {c/UnknownType (c/arity fn-name c/top-type c/top-type)})))
 
 (deftype extend-ast [type impls]
   (assert (instance? c/TaggedSymbol type))
