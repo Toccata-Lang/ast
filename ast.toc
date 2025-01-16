@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "ff96b0c"))
+                          :sha "4e854df"))
 
 (defprotocol FileLoc
   (location [ast]
@@ -418,7 +418,8 @@
 
   Stringable
   (string-list [_] (comp (list "(" (str fn-name) " ")
-                         (string-list params)
+                         (string-list params) " "
+                         (string-list impls)
                          (list ")")))
 
   Container
