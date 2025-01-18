@@ -609,6 +609,19 @@
   (map [x f embed]
     (embed x)))
 
+(deftype superposition-ast [alts loc var constraint]
+  Stringable
+  (string-list [_]
+    (list "(ast/superposition-ast " (str loc) " " (str " '" var "'") (str " " constraint) ")"))
+
+  Container
+  (map [x f]
+    (.alts x (map alts f)))
+
+  (map [x f embed]
+    (map (map alts f embed)
+         (partial .alts x))))
+
 (def main (c/tag 'main))
 
 (defn main-fn [params body]
@@ -622,6 +635,7 @@
 
 (def AST (any-of params-ast
                  definition-ast
+                 superposition-ast
                  binding-ast
                  fn-arity-ast
                  integer-ast
