@@ -3,7 +3,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "3688c6a"))
+                          :sha "1ddb196"))
 
 (defprotocol FileLoc
   (location [ast]
@@ -630,7 +630,7 @@
                             (block-comment-ast [] c/no-loc c/top-type)
                             body)
                   (c/arity main
-                           (c/list-c [(c/vect-c [c/string-constraint])])
+                           (c/vect-c [(c/vect-c [c/string-constraint])])
                            c/top-type))]))
 
 (def AST (any-of params-ast
