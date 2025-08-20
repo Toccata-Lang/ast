@@ -597,7 +597,20 @@
   (map [x f embed]
     (embed x)))
 
-(deftype superposition-ast [alts loc var constraint]
+(deftype duplication-ast [dups loc label var constraint]
+  Stringable
+  (string-list [_]
+    (list "(ast/duplication-ast " (str loc) " " (str " '" var "'") (str " " constraint) ")"))
+
+  Container
+  (map [x f]
+    (.dups x (map dups f)))
+
+  (map [x f embed]
+    (map (map dups f embed)
+         (partial .dups x))))
+
+(deftype superposition-ast [alts loc label var constraint]
   Stringable
   (string-list [_]
     (list "(ast/superposition-ast " (str loc) " " (str " '" var "'") (str " " constraint) ")"))
