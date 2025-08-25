@@ -397,9 +397,10 @@
 (defn declare [sym]
   (declaration-ast sym))
 
-(deftype prototype-ast [fn-name params doc impls var constraint]
+(deftype prototype-ast [fn-name params dup-label doc impls var constraint]
   (assert (instance? c/TaggedSymbol fn-name))
   (assert (instance? params-ast params))
+  (assert (instance? Integer dup-label))
   (assert (instance? block-comment-ast doc))
   (assert (instance? HashMap impls))
   (assert (instance? String var))
@@ -428,7 +429,7 @@
   (location [_] (location fn-name)))
 
 (defn prototype [fn-name args doc default-body]
-  (prototype-ast fn-name args doc
+  (prototype-ast fn-name args 0 doc
                  (cond (empty? (remove default-body (fn [expr]
                                                       (instance? c/Constraints expr))))
                        {}
