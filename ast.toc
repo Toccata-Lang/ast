@@ -194,9 +194,10 @@
 (defn definition [sym value]
   (definition-ast sym value))
 
-(deftype fn-arity-ast [fn-sym arity-id params doc body var constraint]
+(deftype fn-arity-ast [fn-sym arity-id params dup-label doc body var constraint]
   ;; body min count 1
   (assert (instance? c/OptionalSym fn-sym))
+  (assert (instance? Integer dup-label))
   (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
 
   Stringable
@@ -245,8 +246,8 @@
    (fn-arity (c/tag "") params doc (either (instance? Vector body)
                                            [body])))
   ([fn-sym params doc body]
-   (fn-arity-ast fn-sym c/no-symbol params doc (either (instance? Vector body)
-                                                       [body])
+   (fn-arity-ast fn-sym c/no-symbol params 0 doc
+                 (either (instance? Vector body) [body])
                  "" c/top-type)))
 
 (deftype integer-ast [int loc var constraint]
@@ -596,19 +597,6 @@
     x)
   (map [x f embed]
     (embed x)))
-
-(deftype duplication-ast [dups loc label var constraint]
-  Stringable
-  (string-list [_]
-    (list "(ast/duplication-ast " (str loc) " " (str " '" var "'") (str " " constraint) ")"))
-
-  Container
-  (map [x f]
-    (.dups x (map dups f)))
-
-  (map [x f embed]
-    (map (map dups f embed)
-         (partial .dups x))))
 
 (deftype superposition-ast [alts loc label var constraint]
   Stringable
