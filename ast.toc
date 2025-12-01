@@ -87,8 +87,9 @@
 
 (def result-sym (c/tag "#result"))
 
-(deftype inline-ast [constraint txt loc var]
+(deftype inline-ast [constraint c-fn txt loc var]
   (assert (instance? c/ValueConstraint constraint))
+  (assert (instance? String c-fn))
   (assert (instance? String txt))
   (assert (instance? c/Location loc))
 
@@ -107,7 +108,7 @@
   (location [_] loc))
 
 (defn inline [txt constraint path-to-file line-num]
-  (inline-ast txt constraint (c/Location path-to-file line-num) ""))
+  (inline-ast constraint "" txt (c/Location path-to-file line-num) ""))
 
 (defprotocol ParamsProto
   (all-symbols [ast]
@@ -397,7 +398,7 @@
 (defn declare [sym]
   (declaration-ast sym))
 
-(deftype prototype-ast [fn-name params dup-label doc impls var constraint]
+(deftype prototype-ast [fn-name params dup-label doc impls var c-fn constraint]
   (assert (instance? c/TaggedSymbol fn-name))
   (assert (instance? params-ast params))
   (assert (instance? Integer dup-label))
@@ -436,7 +437,7 @@
                        {c/UnknownType (fn-arity fn-name args
                                                 (block-comment-ast [] c/no-loc c/top-type)
                                                 default-body)})
-                 "" (c/ProtoImpls fn-name {c/UnknownType (c/arity fn-name c/top-type c/top-type)})))
+                 "" "" (c/ProtoImpls fn-name {c/UnknownType (c/arity fn-name c/top-type c/top-type)})))
 
 (deftype extend-ast [type impls]
   (assert (instance? c/TaggedSymbol type))
@@ -599,10 +600,12 @@
   (map [x f embed]
     (embed x)))
 
+;; there is no duplication-ast because duplication is not a syntactic construct
 (deftype superposition-ast [alts loc label var constraint]
   Stringable
   (string-list [_]
-    (list "(ast/superposition-ast " (str loc) " " (str " '" var "'") (str " " constraint) ")"))
+    (list "(ast/superposition-ast " (str alts) " " (str loc) " "
+          (str " '" var "'") (str " " constraint) ")"))
 
   Container
   (map [x f]
