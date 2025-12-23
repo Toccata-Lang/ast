@@ -615,6 +615,33 @@
     (map (map alts f embed)
          (partial .alts x))))
 
+(deftype module-ast [file-path loc var constraint]
+  Stringable
+  (string-list [_]
+    (list "(ast/module-ast "  (str " '" file-path "'") " " (str loc) " "
+          (str " '" var "'") (str " " constraint) ")"))
+
+  Container
+  (map [x f]
+    x)
+
+  (map [x f embed]
+    (embed x)))
+
+(deftype add-ns-ast [sym module module-syms loc var constraint]
+  Stringable
+  (string-list [_]
+    (list "(ast/add-ns-ast " (str sym) " " (str module) " " (str loc) " "
+          (str " '" var "'") (str " " constraint) ")"))
+
+  Container
+  (map [x f]
+    (.module x (map module f)))
+
+  (map [x f embed]
+    (map (map module f embed)
+         (partial .module x))))
+
 (def main (c/tag 'main))
 
 (defn main-fn [params body]
