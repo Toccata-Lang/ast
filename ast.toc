@@ -195,10 +195,9 @@
 (defn definition [sym value]
   (definition-ast sym value))
 
-(deftype fn-arity-ast [fn-sym arity-id params dup-label doc body var constraint]
+(deftype fn-arity-ast [fn-sym arity-id params doc body var constraint]
   ;; body min count 1
   (assert (instance? c/OptionalSym fn-sym))
-  (assert (instance? Integer dup-label))
   (assert (instance? (any-of c/AllValues c/fn-arity) constraint))
 
   Stringable
@@ -247,7 +246,7 @@
    (fn-arity (c/tag "") params doc (either (instance? Vector body)
                                            [body])))
   ([fn-sym params doc body]
-   (fn-arity-ast fn-sym c/no-symbol params 0 doc
+   (fn-arity-ast fn-sym c/no-symbol params doc
                  (either (instance? Vector body) [body])
                  "" c/top-type)))
 
@@ -398,10 +397,9 @@
 (defn declare [sym]
   (declaration-ast sym))
 
-(deftype prototype-ast [fn-name params dup-label doc impls var c-fn constraint]
+(deftype prototype-ast [fn-name params doc impls var c-fn constraint]
   (assert (instance? c/TaggedSymbol fn-name))
   (assert (instance? params-ast params))
-  (assert (instance? Integer dup-label))
   (assert (instance? block-comment-ast doc))
   (assert (instance? HashMap impls))
   (assert (instance? String var))
@@ -430,7 +428,7 @@
   (location [_] (location fn-name)))
 
 (defn prototype [fn-name args doc default-body]
-  (prototype-ast fn-name args 0 doc
+  (prototype-ast fn-name args doc
                  (cond (empty? (remove default-body (fn [expr]
                                                       (instance? c/Constraints expr))))
                        {}
@@ -588,11 +586,11 @@
   (location [_]
     (location sym)))
 
-(deftype field-ast [sym idx type-num val-var var constraint]
+(deftype field-ast [sym idx type-num c-fn var constraint]
   Stringable
   (string-list [_]
     (list "(ast/field-ast "  (str sym " " idx " " type-num)
-          (str " '" val-var "'") (str " '" var "'") (str " " constraint) ")"))
+          (str " '" c-fn "'") (str " '" var "'") (str " " constraint) ")"))
 
   Container
   (map [x f]
