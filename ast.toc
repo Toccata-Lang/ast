@@ -127,7 +127,7 @@
   (all-symbols [ast]
     [ast]))
 
-(deftype params-ast [fixed var constraint]
+(deftype params-ast [fixed var static-arity constraint]
   (assert (instance? (vector-of (any-of c/TaggedSymbol
                                         params-ast))
                      fixed))
@@ -141,11 +141,11 @@
 
   Container
   (map [x f]
-    (params-ast (map fixed f) var constraint))
+    (params-ast (map fixed f) var static-arity constraint))
 
   (map [x f embed]
     (for [new-fixed (map fixed f embed)]
-      (params-ast new-fixed var constraint)))
+      (params-ast new-fixed var static-arity constraint)))
 
   Collection
   (count [_] (count fixed))
@@ -164,7 +164,7 @@
                        params-ast))
 
 (defn params [fixed]
-  (params-ast fixed "" c/top-type))
+  (params-ast fixed "" nothing c/top-type))
 
 (defn all-syms [params]
   (assert (instance? ParamType params))
@@ -458,7 +458,7 @@
   (location [_] (location type)))
 
 (defn do-expr [body]
-  (call-expr [(fn-arity (params-ast [] "" c/top-type)
+  (call-expr [(fn-arity (params-ast [] "" nothing c/top-type)
                         (block-comment-ast [] c/no-loc c/top-type)
                         body)]))
 
